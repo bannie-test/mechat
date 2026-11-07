@@ -9,13 +9,6 @@ services:
     restart: unless-stopped
     ports: ["8080:80"]
 
-  garden:
-    build: { context: ., args: { APP_DIR: miniapps/plant } }
-    image: iemanchat-garden
-    env_file: .env
-    restart: unless-stopped
-    ports: ["8081:80"]
-
   # caddy:
   #   image: caddy:2-alpine
   #   restart: unless-stopped

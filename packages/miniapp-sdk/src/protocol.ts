@@ -1,3 +1,7 @@
+/**
+ * Also copied to mechat-miniapps/packages/miniapp-sdk/src/protocol.ts.
+ * Keep both files identical; bump PROTOCOL_VERSION on breaking changes.
+ */
 /** Message protocol between the iemanchat host and a mini app (window.postMessage). */
 export const NS = 'iemanchat' as const
 export const PROTOCOL_VERSION = 1

@@ -228,10 +228,9 @@ export const useMessages = defineStore('messages', () => {
     const b = byChat[msg.chat_id]
     if (b?.loaded) upsert(msg)
     const chats = useChats()
-    if (type === 'INSERT') {
-      // Our own optimistic message already updated the chat list.
-      if (msg.sender_id !== useAuth().userId) chats.onMessageInsert(msg)
-    } else chats.onMessageUpdate(msg)
+    // Idempotent: also covers our own messages sent from a mini app or another device.
+    if (type === 'INSERT') chats.onMessageInsert(msg)
+    else chats.onMessageUpdate(msg)
   }
 
   function onReaction(type: string, row: Partial<Reaction>, old: Partial<Reaction>) {
