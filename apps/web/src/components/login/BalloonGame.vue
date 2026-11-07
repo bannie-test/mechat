@@ -13,22 +13,23 @@ const props = defineProps<{ modelValue: string; disabled?: boolean; shake?: numb
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 
 const W = 320
-const H = 280
+const H = 350
 const ROPE_Y = 10
-const PIVOT = { x: 160, y: 258 }
+const PIVOT = { x: 160, y: 328 }
+const SPEED = 700
 const BARREL = 44
 const R = 23 // balloon radius (x); y radius is R * 1.18
 const COLORS = ['#ff6b6b', '#ff922b', '#fcc419', '#51cf66', '#20c997', '#339af0', '#5c7cfa', '#cc5de8', '#f06595', '#94d82d']
 
 /** Balloon slots: 4 / 3 / 3, hanging from the rope. */
 const SLOTS: [number, number][] = [
-  [48, 58], [123, 58], [197, 58], [272, 58],
-  [86, 124], [160, 124], [234, 124],
-  [48, 190], [160, 196], [272, 190],
+  [48, 52], [123, 52], [197, 52], [272, 52],
+  [86, 112], [160, 112], [234, 112],
+  [48, 172], [160, 178], [272, 172],
 ]
 
 interface Balloon { digit: string; ax: number; len: number; phase: number; color: string; popped: boolean; respawnAt: number; inflate: number }
-interface Ball { id: number; x: number; y: number; vx: number; vy: number; target: number | null; slot: number | null }
+interface Ball { id: number; x: number; y: number; vx: number; vy: number; target: number | null; slot: number | null; trail: { x: number; y: number }[] }
 interface Particle { id: number; x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; r: number; kind: 'shard' | 'smoke' | 'text'; text?: string }
 
 function shuffled<T>(a: T[]) {
@@ -51,6 +52,8 @@ const slots = reactive<(string | null)[]>(Array(LEN).fill(null))
 const reserved = ref(0)
 const angle = ref(0) // degrees from vertical
 const recoil = ref(0)
+/** Time until which the dotted aim line shows (after a shot, or while hovering with a mouse). */
+const aimUntil = ref(0)
 const time = ref(0)
 const shaking = ref(false)
 const svg = ref<SVGSVGElement | null>(null)
@@ -91,7 +94,8 @@ function fire(target: number | null, tx: number, ty: number) {
   const dir = { x: Math.sin(rad), y: -Math.cos(rad) }
   const x = PIVOT.x + dir.x * BARREL
   const y = PIVOT.y + dir.y * BARREL
-  balls.push({ id: uid++, x, y, vx: dir.x * 760, vy: dir.y * 760, target, slot: target === null ? null : reserved.value++ })
+  balls.push({ id: uid++, x, y, vx: dir.x * SPEED, vy: dir.y * SPEED, target, slot: target === null ? null : reserved.value++, trail: [] })
+  aimUntil.value = time.value + 0.35
   recoil.value = 1
   for (let i = 0; i < 5; i++) {
     particles.push({
@@ -199,7 +203,9 @@ function onDown(e: PointerEvent) {
 function onMove(e: PointerEvent) {
   if (e.pointerType !== 'mouse') return
   const p = toSvg(e)
-  if (p) aimAt(p.x, p.y)
+  if (!p) return
+  aimAt(p.x, p.y)
+  aimUntil.value = time.value + 0.6
 }
 
 function onKey(e: KeyboardEvent) {
@@ -253,11 +259,13 @@ function frame(now: number) {
         balls.splice(i, 1)
         continue
       }
-      ball.vx = (dx / dist) * 760
-      ball.vy = (dy / dist) * 760
+      ball.vx = (dx / dist) * SPEED
+      ball.vy = (dy / dist) * SPEED
     } else {
       ball.vy += 900 * dt
     }
+    ball.trail.unshift({ x: ball.x, y: ball.y })
+    if (ball.trail.length > 6) ball.trail.pop()
     ball.x += ball.vx * dt
     ball.y += ball.vy * dt
     if (ball.x < -20 || ball.x > W + 20 || ball.y < -20 || ball.y > H + 20) balls.splice(i, 1)
@@ -341,8 +349,19 @@ const ease = (x: number) => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1,
         <circle v-if="p.kind !== 'text'" :cx="p.x" :cy="p.y" :r="p.r" :fill="p.color" :opacity="1 - p.life / p.max" />
         <text v-else :x="p.x" :y="p.y" text-anchor="middle" class="float" :fill="p.color" :opacity="1 - p.life / p.max">{{ p.text }}</text>
       </template>
-      <!-- balls -->
-      <circle v-for="b in balls" :key="b.id" :cx="b.x" :cy="b.y" r="7" class="ball" />
+      <!-- balls with a short trail -->
+      <g v-for="b in balls" :key="b.id">
+        <circle v-for="(p, k) in b.trail" :key="k" :cx="p.x" :cy="p.y" :r="6 - k * 0.8" class="trail" :opacity="0.4 - k * 0.06" />
+        <circle :cx="b.x" :cy="b.y" r="7" class="ball" />
+      </g>
+      <!-- ground the cannon stands on -->
+      <path :d="`M0 ${H - 10}Q${W / 2} ${PIVOT.y - 22} ${W} ${H - 10}V${H}H0z`" class="ground" />
+      <!-- dotted aim line -->
+      <line
+        v-if="aimUntil > time" class="aim" :opacity="Math.min(1, (aimUntil - time) * 3)"
+        :x1="PIVOT.x + Math.sin(angle * Math.PI / 180) * (BARREL + 8)" :y1="PIVOT.y - Math.cos(angle * Math.PI / 180) * (BARREL + 8)"
+        :x2="PIVOT.x + Math.sin(angle * Math.PI / 180) * (BARREL + 90)" :y2="PIVOT.y - Math.cos(angle * Math.PI / 180) * (BARREL + 90)"
+      />
       <!-- cannon -->
       <g :transform="`translate(${PIVOT.x} ${PIVOT.y})`">
         <g :transform="`rotate(${angle})`" class="barrel">
@@ -384,6 +403,9 @@ const ease = (x: number) => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1,
 .num { font: 800 23px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #fff; stroke: rgba(0, 0, 0, 0.25); stroke-width: 3; paint-order: stroke; pointer-events: none; }
 .float { font: 900 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; stroke: #fff; stroke-width: 4; paint-order: stroke; }
 .ball { fill: #2b2f3a; stroke: #fff; stroke-width: 2; }
+.trail { fill: var(--text-muted); }
+.ground { fill: color-mix(in srgb, #51cf66 22%, transparent); }
+.aim { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 2 8; stroke-linecap: round; }
 .barrel rect { fill: #3b4252; }
 .barrel .lip { fill: #2b303b; }
 .base { fill: #59627a; }

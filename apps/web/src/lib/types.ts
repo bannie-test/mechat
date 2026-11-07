@@ -1,5 +1,5 @@
 export type ChatType = 'direct' | 'group'
-export type MessageKind = 'text' | 'image' | 'file' | 'voice' | 'sticker' | 'gif' | 'system'
+export type MessageKind = 'text' | 'image' | 'file' | 'voice' | 'sticker' | 'gif' | 'system' | 'call'
 export type Locale = 'en' | 'vi'
 
 export interface Profile {

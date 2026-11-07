@@ -34,7 +34,9 @@ export const useMessages = defineStore('messages', () => {
   const preparers = new Map<string, () => Promise<Attachment>>()
 
   function bucket(chatId: string): ChatMessages {
-    return (byChat[chatId] ??= { items: [], loaded: false, hasMore: true, loading: false })
+    // Read back through the reactive object: `x ??= {}` would return the raw, untracked object.
+    if (!byChat[chatId]) byChat[chatId] = { items: [], loaded: false, hasMore: true, loading: false }
+    return byChat[chatId]
   }
 
   function upsert(msg: Message) {
@@ -199,7 +201,8 @@ export const useMessages = defineStore('messages', () => {
 
   async function toggleReaction(msg: Message, emoji: string) {
     const me = useAuth().userId!
-    const list = (reactions[msg.id] ??= [])
+    if (!reactions[msg.id]) reactions[msg.id] = []
+    const list = reactions[msg.id]
     const mine = list.find((r) => r.user_id === me && r.emoji === emoji)
     if (mine) {
       reactions[msg.id] = list.filter((r) => r !== mine)
@@ -235,7 +238,8 @@ export const useMessages = defineStore('messages', () => {
 
   function onReaction(type: string, row: Partial<Reaction>, old: Partial<Reaction>) {
     if (type === 'INSERT' && row.message_id) {
-      const list = (reactions[row.message_id] ??= [])
+      if (!reactions[row.message_id]) reactions[row.message_id] = []
+      const list = reactions[row.message_id]
       if (!list.some((r) => r.user_id === row.user_id && r.emoji === row.emoji)) list.push(row as Reaction)
     } else if (type === 'DELETE' && old.message_id && reactions[old.message_id]) {
       reactions[old.message_id] = reactions[old.message_id].filter(

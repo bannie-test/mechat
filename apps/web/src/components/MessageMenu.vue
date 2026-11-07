@@ -40,7 +40,7 @@ onMounted(() => {
         <button v-if="!msg._status" v-ripple @click="emit('action', 'reply')"><Icon name="reply" :size="20" />{{ $t('menu.reply') }}</button>
         <button v-if="canCopy" v-ripple @click="emit('action', 'copy')"><Icon name="copy" :size="20" />{{ $t('menu.copy') }}</button>
         <button v-if="canEdit" v-ripple @click="emit('action', 'edit')"><Icon name="edit" :size="20" />{{ $t('menu.edit') }}</button>
-        <button v-if="!msg._status" v-ripple @click="emit('action', 'forward')"><Icon name="forward" :size="20" />{{ $t('menu.forward') }}</button>
+        <button v-if="!msg._status && msg.kind !== 'call'" v-ripple @click="emit('action', 'forward')"><Icon name="forward" :size="20" />{{ $t('menu.forward') }}</button>
         <button v-if="mine" v-ripple class="danger" @click="emit('action', 'delete')"><Icon name="trash" :size="20" />{{ $t('menu.delete') }}</button>
       </div>
     </div>

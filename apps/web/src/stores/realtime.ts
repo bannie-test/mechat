@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { reactive, ref } from 'vue'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { fire, supabase } from '@/lib/supabase'
 import type { ChatMember, Message, Profile, Reaction } from '@/lib/types'
+import { useCall, type CallRow } from './call'
 import { useChats } from './chats'
 import { useMessages } from './messages'
 
@@ -46,6 +47,9 @@ export const useRealtime = defineStore('realtime', () => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats' }, (p) =>
         chats.onChatUpdate(p.new as { id: string }),
       )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, (p) => {
+        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') useCall().onRow(p.eventType, p.new as CallRow)
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (p) => {
         if (p.eventType !== 'DELETE') chats.onProfile(p.new as Profile)
       })
@@ -67,7 +71,8 @@ export const useRealtime = defineStore('realtime', () => {
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         const { chat_id, user_id } = payload as { chat_id: string; user_id: string }
         if (user_id === me) return
-        ;(typing[chat_id] ??= {})[user_id] = Date.now() + TYPING_TTL
+        if (!typing[chat_id]) typing[chat_id] = {}
+        typing[chat_id][user_id] = Date.now() + TYPING_TTL
       })
       .on('broadcast', { event: 'stop_typing' }, ({ payload }) => {
         const { chat_id, user_id } = payload as { chat_id: string; user_id: string }
@@ -99,7 +104,7 @@ export const useRealtime = defineStore('realtime', () => {
       void resync()
     } else {
       await lobby.untrack()
-      void supabase.rpc('touch_last_seen')
+      fire(supabase.rpc('touch_last_seen'))
     }
   }
 
@@ -108,6 +113,7 @@ export const useRealtime = defineStore('realtime', () => {
     const chats = useChats()
     const messages = useMessages()
     await chats.load().catch(() => {})
+    void useCall().init().catch(() => {})
     if (chats.activeChatId) await messages.loadLatest(chats.activeChatId).catch(() => {})
   }
 

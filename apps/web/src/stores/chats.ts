@@ -31,7 +31,10 @@ export const useChats = defineStore('chats', () => {
     if (error) throw error
     list.value = (data ?? []) as ChatSummary[]
     for (const k of Object.keys(members)) delete members[k]
-    for (const m of (rows ?? []) as ChatMember[]) (members[m.chat_id] ??= []).push(m)
+    for (const m of (rows ?? []) as ChatMember[]) {
+      if (!members[m.chat_id]) members[m.chat_id] = []
+      members[m.chat_id].push(m)
+    }
     loaded.value = true
   }
 

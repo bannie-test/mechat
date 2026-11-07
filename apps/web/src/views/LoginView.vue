@@ -150,8 +150,10 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
       </div>
 
       <div class="card" :class="{ compact: step === 'code' }">
-        <img src="/favicon.svg" alt="" class="logo" />
-        <h1>iemanchat</h1>
+        <div class="brand">
+          <img src="/favicon.svg" alt="" class="logo" />
+          <h1>iemanchat</h1>
+        </div>
 
         <Transition name="fade" mode="out-in">
           <div v-if="step === 'form'" key="form" class="stack">
@@ -233,7 +235,7 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
 
 <style scoped>
 .login {
-  --water-top: #8fd3f4; --water-deep: #4aa3dc; --water-front: rgba(64, 156, 216, 0.9); --foam: rgba(255, 255, 255, 0.75);
+  --water-top: #8fd3f4; --water-deep: #4aa3dc; --water-front: rgba(64, 156, 216, 0.82); --foam: rgba(255, 255, 255, 0.75);
   position: relative; min-height: 100%; display: flex; flex-direction: column; align-items: center;
   padding-top: calc(24px + var(--safe-top)); overflow-x: hidden; overflow-y: auto;
   background: linear-gradient(170deg, var(--chat-bg), var(--chat-bg-2));
@@ -260,8 +262,10 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
   border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-lg); animation: card-in 0.5s var(--ease-out);
 }
 @keyframes card-in { from { transform: translateY(20px) scale(0.97); opacity: 0; } }
-.logo { justify-self: center; width: 88px; height: 88px; transition: width 0.3s, height 0.3s; animation: float 4s ease-in-out infinite; }
-.compact .logo { width: 52px; height: 52px; }
+.brand { display: grid; justify-items: center; gap: 14px; }
+.compact .brand { display: flex; justify-content: center; align-items: center; gap: 10px; }
+.logo { width: 88px; height: 88px; transition: width 0.3s, height 0.3s; animation: float 4s ease-in-out infinite; }
+.compact .logo { width: 40px; height: 40px; }
 .compact { gap: 10px; padding: 18px 16px 26px; }
 @keyframes float { 50% { transform: translateY(-6px); } }
 h1 { margin: 0; font-size: 26px; }
@@ -288,15 +292,15 @@ h1 { margin: 0; font-size: 26px; }
 .btn .spinner { width: 18px; height: 18px; border-width: 2px; }
 
 /* Pond under the card: capybara (z2) sits between the back water and the front wave (z3). */
-.pond { position: relative; z-index: 2; height: 118px; margin-top: -22px; pointer-events: none; }
+.pond { position: relative; z-index: 2; height: 140px; margin-top: -20px; pointer-events: none; }
 .pool-front {
-  position: absolute; z-index: 3; left: 50%; width: 100vw; margin-left: -50vw; bottom: -60px; height: 110px;
+  position: absolute; z-index: 3; left: 50%; width: 100vw; margin-left: -50vw; bottom: -60px; height: 78px;
   background: linear-gradient(180deg, var(--water-front), var(--water-deep));
 }
-.drift { position: absolute; z-index: 2; bottom: -6px; width: 112px; animation: drift 19s ease-in-out infinite alternate; }
+.drift { position: absolute; z-index: 2; bottom: -6px; width: 150px; animation: drift 22s ease-in-out infinite alternate; }
 .drift.stop { animation-play-state: paused; }
-@keyframes drift { from { left: 0; } to { left: calc(100% - 112px); } }
-.ripples { z-index: 4; bottom: 40px; height: 18px; }
+@keyframes drift { from { left: -6px; } to { left: calc(100% - 144px); } }
+.ripples { z-index: 4; bottom: 14px; height: 22px; }
 .ripples i {
   position: absolute; left: 50%; top: 0; width: 120px; height: 18px; margin-left: -60px; border-radius: 50%;
   border: 2px solid var(--foam); opacity: 0; animation: ripple 3.4s ease-out infinite;

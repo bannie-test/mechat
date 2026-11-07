@@ -18,6 +18,9 @@ interface PushPayload {
   icon?: string
   chatId?: string
   url?: string
+  /** Incoming call: keep the notification up and vibrate like a ring. */
+  call?: boolean
+  tag?: string
 }
 
 const isIos = /iphone|ipad|ipod/i.test(self.navigator.userAgent)
@@ -34,9 +37,10 @@ self.addEventListener('push', (event) => {
         body: data.body,
         icon: data.icon || '/pwa-192x192.png',
         badge: '/pwa-192x192.png',
-        tag: data.chatId,
+        tag: data.tag ?? data.chatId,
         data: { url: data.url ?? '/' },
-      })
+        ...(data.call ? { requireInteraction: true, renotify: true, vibrate: [400, 200, 400, 200, 400] } : {}),
+      } as NotificationOptions)
     })(),
   )
 })

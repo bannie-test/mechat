@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { callLogInfo } from '@/lib/call/labels'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -53,6 +54,10 @@ function messagePreview(m: Message) {
     case 'voice': return `🎤 ${t('kind.voice')}`
     case 'sticker': return `${m.content ?? ''} ${t('kind.sticker')}`
     case 'gif': return t('kind.gif')
+    case 'call': {
+      const info = callLogInfo(m, m.sender_id === auth.userId, chats.byId(m.chat_id)?.type === 'group')
+      return `${info.video ? '📹' : '📞'} ${t(info.key)}`
+    }
     case 'system': return t(`system.${m.content}`, { name: chats.people[m.sender_id ?? '']?.display_name ?? '' })
     default: return m.content ?? ''
   }

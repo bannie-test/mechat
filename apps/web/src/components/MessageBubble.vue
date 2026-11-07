@@ -13,6 +13,7 @@ import Avatar from './Avatar.vue'
 import Icon from './Icon.vue'
 import MediaImage from './MediaImage.vue'
 import VoicePlayer from './VoicePlayer.vue'
+import CallLog from './call/CallLog.vue'
 
 const props = defineProps<{
   msg: Message
@@ -160,6 +161,7 @@ onBeforeUnmount(() => unbind?.())
             <small>{{ formatBytes(msg.attachment?.size) }}</small>
           </span>
         </button>
+        <CallLog v-else-if="msg.kind === 'call'" :msg="msg" :mine="mine" :chat-type="chatType" />
         <p v-else class="text" :class="{ big: bigEmoji }"><template v-for="(s, i) in segments" :key="i"><a v-if="s.href" :href="s.href" target="_blank" rel="noopener noreferrer" @click.stop>{{ s.text }}</a><template v-else>{{ s.text }}</template></template></p>
 
         <span class="meta" :class="{ overlay: (msg.kind === 'image' && !msg.content) || msg.kind === 'gif' || bare }">
@@ -243,7 +245,7 @@ onBeforeUnmount(() => unbind?.())
   padding: 1px 6px; border-radius: 10px; background: rgba(0, 0, 0, 0.42); color: #fff;
 }
 .bare .meta.overlay { right: 2px; bottom: 2px; }
-.voice + .meta, .file + .meta { float: none; display: flex; justify-content: flex-end; margin: 2px 0 0; bottom: 0; }
+.voice + .meta, .file + .meta, .call-log + .meta { float: none; display: flex; justify-content: flex-end; margin: 2px 0 0; bottom: 0; }
 .edited { font-style: italic; }
 .failed { color: var(--danger); display: inline-grid; }
 

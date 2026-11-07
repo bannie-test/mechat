@@ -7,6 +7,7 @@ import { formatDay, formatTime, isSameDay } from '@/lib/format'
 import type { Message } from '@/lib/types'
 import { useWide } from '@/composables/useBreakpoint'
 import { useAuth } from '@/stores/auth'
+import { useCall } from '@/stores/call'
 import { useChats } from '@/stores/chats'
 import { useMessages } from '@/stores/messages'
 import { useRealtime } from '@/stores/realtime'
@@ -30,6 +31,7 @@ const messages = useMessages()
 const realtime = useRealtime()
 const settings = useSettings()
 const ui = useUi()
+const call = useCall()
 
 const chat = computed(() => chats.byId(props.chatId))
 const bucket = computed(() => messages.bucket(props.chatId))
@@ -58,6 +60,12 @@ const subtitle = computed(() => {
     : t('chat.lastSeenOn', { date: d.toLocaleDateString(settings.locale === 'vi' ? 'vi-VN' : 'en-US') })
 })
 const isTyping = computed(() => realtime.typingIn(props.chatId).length > 0)
+
+// A call is going on in this chat and we're not in it → offer to join.
+const liveHere = computed(() => {
+  const row = call.liveCall(props.chatId)
+  return row && !(call.inCall && call.chatId === props.chatId) ? row : null
+})
 const headerOnline = computed(() => chat.value?.type === 'direct' && realtime.online.has(chat.value.peer_id ?? ''))
 
 // ---- rows (date separators + sender runs) -----------------------------------
@@ -268,9 +276,20 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
           </small>
         </span>
       </button>
-      <button v-ripple class="icon-btn" :title="$t('apps.title')" @click="ui.openAppDrawer(chatId)"><Icon name="apps" /></button>
+      <button v-if="wide" v-ripple class="icon-btn" :title="$t('apps.title')" @click="ui.openAppDrawer(chatId)"><Icon name="apps" /></button>
+      <button v-ripple class="icon-btn" :title="$t('call.voice')" @click="call.start(chatId, 'voice')"><Icon name="phone" /></button>
+      <button v-ripple class="icon-btn" :title="$t('call.video')" @click="call.start(chatId, 'video')"><Icon name="videocam" /></button>
       <button v-ripple class="icon-btn" :title="$t('chat.info')" @click="infoOpen = true"><Icon name="more" /></button>
     </header>
+
+    <Transition name="bar">
+      <button v-if="liveHere" class="live-call" @click="call.start(chatId, liveHere.kind)">
+        <span class="live-dot" />
+        <Icon :name="liveHere.kind === 'video' ? 'videocam' : 'phone'" :size="18" />
+        <span class="grow">{{ $t('call.joinBar') }}</span>
+        <b>{{ $t('call.join') }}</b>
+      </button>
+    </Transition>
 
     <div ref="scroller" class="messages scroll" @scroll.passive="onScroll">
       <div class="inner">
@@ -370,6 +389,16 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
 .dots i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes dot { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
 
+.live-call {
+  position: relative; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 9px 16px; color: #fff;
+  background: #2fb36a; font-size: 14px; text-align: left;
+}
+.live-call .grow { flex: 1; }
+.live-call b { padding: 3px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.22); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: live-blink 1.2s ease-in-out infinite; }
+@keyframes live-blink { 50% { opacity: 0.3; } }
+.bar-enter-active, .bar-leave-active { transition: max-height 0.3s var(--ease-out), opacity 0.25s; max-height: 44px; overflow: hidden; }
+.bar-enter-from, .bar-leave-to { max-height: 0; opacity: 0; }
 .messages { position: relative; flex: 1; touch-action: pan-y; }
 .inner { max-width: 760px; margin: 0 auto; padding: 8px 12px 8px; min-height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
 .loading, .older { display: grid; place-items: center; padding: 12px; color: #fff; min-height: 24px; }

@@ -27,6 +27,9 @@ Mini apps (Little Garden, Lịch âm, …) live in a separate repo:
   code. The **first** user to sign up needs no code and becomes admin.
 - **Login:** email OTP. The email contains both a 6-digit code and a magic link — the code is what
   works inside an installed PWA (links open in the browser, not the app).
+- **Calls:** voice/video calls, screen sharing and screenshots, peer-to-peer over WebRTC (a small
+  mesh, best for up to ~6 people). Signaling runs over a Realtime channel `call:<id>`; the `calls`
+  table drives ringing, "join" banners and the call log message in the chat. See `src/lib/call/`.
 - **Mini apps:** any static bundle at any URL, listed in the `mini_apps` table and opened in a
   sandboxed iframe. The host sends the user's Supabase access token (only to the app's registered
   origin) and refreshes it; the mini app uses the same database under the same RLS. See
@@ -39,7 +42,8 @@ Mini apps (Little Garden, Lịch âm, …) live in a separate repo:
 2. Apply the schema in the dashboard: **SQL Editor → New query**, paste each file from
    `supabase/migrations/` **in filename order**, click **Run**. Every future schema change is a new
    numbered file in that folder — run only the new ones, in order, and never edit an applied file.
-   Applied so far: `20261107000000_init.sql`. (Mini apps keep their SQL in their own repo.)
+   Applied so far: `20261107000000_init.sql`, `20261108000000_open_signup.sql`,
+   `20261109000000_calls.sql`. (Mini apps keep their SQL in their own repo.)
 3. **Auth → URL configuration:** Site URL = your app URL (e.g. `https://iemanchat.pages.dev`), add
    `http://localhost:5173` to redirect URLs.
 4. **Auth → Email templates:** paste `supabase/templates/magic_link.html` into both **Magic Link**
@@ -59,6 +63,20 @@ Mini apps (Little Garden, Lịch âm, …) live in a separate repo:
    select vault.create_secret('<your PUSH_WEBHOOK_SECRET>', 'push_webhook_secret');
    ```
    iPhone users must "Add to Home Screen" before they can enable notifications (iOS 16.4+).
+   When `supabase/functions/push/index.ts` changes (it did for calls), paste it into the `push`
+   function again and deploy.
+7. **Calls: relay server (optional, recommended).** Calls connect directly between devices. That works
+   on most networks; when both people sit behind strict networks (some 4G carriers, office Wi-Fi) the
+   call needs a TURN relay. Cloudflare's TURN has a free monthly allowance:
+   - Cloudflare dashboard → **Realtime** → **TURN Server** → **Create**; copy the **Turn Token ID** and
+     **API Token**.
+   - Supabase → **Edge Functions → Secrets:** add `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`.
+   - **Edge Functions → Deploy a new function → Via Editor**, name `turn`, paste
+     `supabase/functions/turn/index.ts`, deploy. Keep **"Enforce JWT verification" ON** (only
+     signed-in users get relay credentials).
+   Without this function calls still work, using free public STUN servers only.
+   Calls need the app on **https://** (Cloudflare Pages is). Screen sharing works in desktop browsers;
+   phone browsers don't allow it.
 
 ## 2. Local development
 

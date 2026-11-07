@@ -15,8 +15,8 @@ webpush.setVapidDetails(
 )
 
 const T = {
-  en: { image: '📷 Photo', file: '📎 File', voice: '🎤 Voice message', sticker: 'Sticker', gif: 'GIF', text: '' },
-  vi: { image: '📷 Hình ảnh', file: '📎 Tệp', voice: '🎤 Tin nhắn thoại', sticker: 'Nhãn dán', gif: 'GIF', text: '' },
+  en: { image: '📷 Photo', file: '📎 File', voice: '🎤 Voice message', sticker: 'Sticker', gif: 'GIF', text: '', call: '📞 Incoming call', callVideo: '📹 Incoming video call' },
+  vi: { image: '📷 Hình ảnh', file: '📎 Tệp', voice: '🎤 Tin nhắn thoại', sticker: 'Nhãn dán', gif: 'GIF', text: '', call: '📞 Cuộc gọi đến', callVideo: '📹 Cuộc gọi video đến' },
 } as const
 type Locale = keyof typeof T
 type Kind = keyof (typeof T)['en']
@@ -54,21 +54,27 @@ Deno.serve(async (req) => {
     (subs ?? []).map(async (s) => {
       const t = T[localeOf.get(s.user_id) ?? 'en'] ?? T.en
       const kind = msg.kind as Kind
-      const preview = kind === 'text' || (kind === 'sticker' && msg.content)
-        ? (msg.content ?? '').slice(0, 140)
-        : t[kind] ?? ''
+      const isCall = kind === 'call'
+      const preview = isCall
+        ? (msg.attachment?.call_kind === 'video' ? t.callVideo : t.call)
+        : kind === 'text' || (kind === 'sticker' && msg.content)
+          ? (msg.content ?? '').slice(0, 140)
+          : t[kind] ?? ''
       const payload = {
         title: chat.type === 'group' ? chat.title ?? 'iemanchat' : senderName,
         body: chat.type === 'group' ? `${senderName}: ${preview}` : preview,
         icon: sender?.avatar_url ?? undefined,
         chatId: chat.id,
         url: `/c/${chat.id}`,
+        // Calls: a separate, ringing-style notification that is useless after a minute.
+        call: isCall || undefined,
+        tag: isCall ? `call-${msg.attachment?.call_id ?? msg.id}` : undefined,
       }
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           JSON.stringify(payload),
-          { TTL: 60 * 60 * 24, urgency: 'high' },
+          { TTL: isCall ? 60 : 60 * 60 * 24, urgency: 'high' },
         )
       } catch (err) {
         const code = (err as { statusCode?: number }).statusCode
