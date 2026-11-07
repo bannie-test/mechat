@@ -1,0 +1,7 @@
+# Automatic HTTPS. Replace the domains, uncomment the caddy service in docker-compose.yml.
+chat.example.com {
+  reverse_proxy web:80
+}
+garden.example.com {
+  reverse_proxy garden:80
+}
