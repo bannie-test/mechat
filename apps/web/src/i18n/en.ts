@@ -25,6 +25,12 @@ export default {
     changeEmail: 'Change email',
     resend: 'Resend code',
     resendIn: 'Resend in {s}s',
+    game: {
+      hint: 'Tap the balloons to shoot the code from your email 🎯',
+      back: 'Delete last digit',
+      typeInstead: 'Type the code instead',
+      playInstead: 'Shoot balloons instead 🎈',
+    },
     errors: {
       rateLimit: 'Too many attempts. Please wait a minute and try again.',
       noAccount: 'No account with this email yet. Use the Create account tab.',

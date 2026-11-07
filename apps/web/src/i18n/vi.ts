@@ -26,6 +26,12 @@ const vi: typeof en = {
     changeEmail: 'Đổi email',
     resend: 'Gửi lại mã',
     resendIn: 'Gửi lại sau {s}s',
+    game: {
+      hint: 'Chạm vào bóng bay để bắn mã trong email nhé 🎯',
+      back: 'Xoá số cuối',
+      typeInstead: 'Nhập mã bằng bàn phím',
+      playInstead: 'Bắn bóng bay để nhập mã 🎈',
+    },
     errors: {
       rateLimit: 'Thử quá nhiều lần. Vui lòng đợi một phút rồi thử lại.',
       noAccount: 'Chưa có tài khoản với email này. Hãy chọn thẻ Tạo tài khoản.',
