@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
-# Builds one static app of the monorepo and serves it with nginx.
+# Builds the chat app and serves it with nginx.
 #   docker build -t iemanchat-web .
-#   docker build -t iemanchat-garden --build-arg APP_DIR=miniapps/plant .
+# (Mini apps live in the separate mechat-miniapps repo, with their own image.)
 # Config is injected at container start (see docker/40-env-js.sh), so one image works anywhere.
 
 FROM node:22-alpine AS build
@@ -10,7 +10,6 @@ WORKDIR /repo
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json apps/web/
-COPY miniapps/plant/package.json miniapps/plant/
 COPY packages/miniapp-sdk/package.json packages/miniapp-sdk/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 COPY . .

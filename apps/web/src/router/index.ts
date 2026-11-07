@@ -23,7 +23,7 @@ export const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuth()
   await auth.init()
-  if (!to.meta.public && !auth.session) return { name: 'login', query: to.query.invite ? { invite: to.query.invite } : undefined }
+  if (!to.meta.public && !auth.session) return { name: 'login', query: to.query.join !== undefined ? { join: null } : undefined }
   if (to.name === 'login' && auth.session) return { name: 'home' }
 })
 
