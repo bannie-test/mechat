@@ -1,0 +1,27 @@
+# VPS deployment: `docker compose up -d --build`
+# Reads Supabase settings from .env (same file as local dev). Put a TLS proxy in front
+# (Caddy example in docker/Caddyfile) — push notifications and mic need HTTPS.
+services:
+  web:
+    build: { context: ., args: { APP_DIR: apps/web } }
+    image: iemanchat-web
+    env_file: .env
+    restart: unless-stopped
+    ports: ["8080:80"]
+
+  garden:
+    build: { context: ., args: { APP_DIR: miniapps/plant } }
+    image: iemanchat-garden
+    env_file: .env
+    restart: unless-stopped
+    ports: ["8081:80"]
+
+  # caddy:
+  #   image: caddy:2-alpine
+  #   restart: unless-stopped
+  #   ports: ["80:80", "443:443"]
+  #   volumes:
+  #     - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+# volumes:
+#   caddy_data:
