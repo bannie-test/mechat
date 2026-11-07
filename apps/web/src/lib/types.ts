@@ -85,16 +85,6 @@ export interface ChatSummary {
   last_message: Message | null
 }
 
-export interface Invite {
-  code: string
-  created_by: string | null
-  note: string | null
-  used_by: string | null
-  used_at: string | null
-  expires_at: string
-  created_at: string
-}
-
 export interface MiniApp {
   id: string
   name: Partial<Record<Locale, string>>

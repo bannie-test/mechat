@@ -35,20 +35,14 @@ export const useAuth = defineStore('auth', () => {
     return initPromise
   }
 
-  async function checkInvite(code: string) {
-    const { data, error } = await supabase.rpc('check_invite', { p_code: code })
-    if (error) throw error
-    return Boolean(data)
-  }
-
-  async function sendCode(email: string, signup?: { invite: string; displayName: string; locale: Locale }) {
+  async function sendCode(email: string, signup?: { displayName: string; locale: Locale }) {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
         shouldCreateUser: Boolean(signup),
         emailRedirectTo: location.origin,
         data: signup
-          ? { invite_code: signup.invite.trim().toUpperCase(), display_name: signup.displayName.trim(), locale: signup.locale }
+          ? { display_name: signup.displayName.trim(), locale: signup.locale }
           : undefined,
       },
     })
@@ -76,5 +70,5 @@ export const useAuth = defineStore('auth', () => {
     profile.value = null
   }
 
-  return { session, profile, ready, userId, init, loadProfile, checkInvite, sendCode, verifyCode, updateProfile, signOut }
+  return { session, profile, ready, userId, init, loadProfile, sendCode, verifyCode, updateProfile, signOut }
 })

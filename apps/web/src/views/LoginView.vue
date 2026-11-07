@@ -12,12 +12,10 @@ const router = useRouter()
 const auth = useAuth()
 const settings = useSettings()
 
-const inviteFromLink = typeof route.query.invite === 'string' ? route.query.invite : ''
-const mode = ref<'signin' | 'join'>(inviteFromLink ? 'join' : 'signin')
+const mode = ref<'signin' | 'join'>(route.query.join !== undefined ? 'join' : 'signin')
 const step = ref<'form' | 'code'>('form')
 const email = ref('')
 const name = ref('')
-const invite = ref(inviteFromLink)
 const code = ref('')
 const busy = ref(false)
 const error = ref('')
@@ -25,13 +23,12 @@ const codeInput = ref<HTMLInputElement | null>(null)
 const cooldown = ref(0)
 
 const canSubmit = computed(() =>
-  /.+@.+\..+/.test(email.value) && (mode.value === 'signin' || (name.value.trim() && invite.value.trim().length >= 6)),
+  /.+@.+\..+/.test(email.value) && (mode.value === 'signin' || name.value.trim()),
 )
 
 function describe(e: unknown) {
   const msg = String((e as { message?: string })?.message ?? '')
   if (/rate|security purposes/i.test(msg)) return t('login.errors.rateLimit')
-  if (/INVITE_REQUIRED|Database error saving new user/i.test(msg)) return t('login.errors.invite')
   if (/Signups not allowed|not found|otp_disabled/i.test(msg)) return t('login.errors.noAccount')
   if (/expired|invalid/i.test(msg)) return t('login.errors.badCode')
   return msg || t('errors.generic')
@@ -51,9 +48,7 @@ async function send() {
   error.value = ''
   try {
     if (mode.value === 'join') {
-      const ok = await auth.checkInvite(invite.value)
-      if (!ok) throw new Error('INVITE_REQUIRED')
-      await auth.sendCode(email.value, { invite: invite.value, displayName: name.value, locale: settings.locale })
+      await auth.sendCode(email.value, { displayName: name.value, locale: settings.locale })
     } else {
       await auth.sendCode(email.value)
     }
@@ -111,7 +106,6 @@ watch(() => auth.session, (s) => { if (s) void router.replace({ name: 'home' }) 
           <form class="stack" @submit.prevent="send">
             <Transition name="bar">
               <div v-if="mode === 'join'" class="stack">
-                <label class="field"><input v-model="invite" autocapitalize="characters" autocomplete="off" required /><span>{{ $t('login.inviteCode') }}</span></label>
                 <label class="field"><input v-model="name" autocomplete="name" maxlength="64" required /><span>{{ $t('login.yourName') }}</span></label>
               </div>
             </Transition>
