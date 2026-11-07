@@ -125,6 +125,7 @@ function waterWipe() {
 
 watch(code, (v) => {
   code.value = v.replace(/\D/g, '').slice(0, 6)
+  if (code.value && !busy.value) error.value = ''
   if (code.value.length === 6) void verify()
 })
 
