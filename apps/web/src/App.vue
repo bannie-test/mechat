@@ -6,17 +6,21 @@ import { registerSW } from 'virtual:pwa-register'
 import { isConfigured } from '@/lib/supabase'
 import { useSettings } from '@/stores/settings'
 import { useAuth } from '@/stores/auth'
+import { useCall } from '@/stores/call'
 import { useChats } from '@/stores/chats'
 import { useMessages } from '@/stores/messages'
 import { useRealtime } from '@/stores/realtime'
 import { useUi } from '@/stores/ui'
 import ToastHost from '@/components/ToastHost.vue'
+import CallOverlay from '@/components/call/CallOverlay.vue'
+import IncomingCall from '@/components/call/IncomingCall.vue'
 
 useSettings()
 const auth = useAuth()
 const chats = useChats()
 const messages = useMessages()
 const realtime = useRealtime()
+const call = useCall()
 const ui = useUi()
 const router = useRouter()
 const { t } = useI18n()
@@ -28,8 +32,10 @@ watch(
     if (id) {
       realtime.start(id)
       await Promise.all([chats.loadPeople(), chats.load()]).catch((e) => console.error(e))
+      void call.init().catch((e) => console.error(e))
     } else {
       if (!auth.ready) return
+      void call.stopAll()
       realtime.stop()
       chats.reset()
       messages.reset()
@@ -69,6 +75,10 @@ onMounted(() => {
     <code>VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY</code>
   </div>
   <RouterView v-else />
+  <template v-if="auth.userId">
+    <CallOverlay />
+    <IncomingCall />
+  </template>
   <ToastHost />
 </template>
 
