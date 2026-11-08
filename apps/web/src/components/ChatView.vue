@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { goBack } from '@/router'
 import { formatDay, formatTime, isSameDay } from '@/lib/format'
 import type { Message } from '@/lib/types'
+import type { MessageAction } from '@/lib/messageActions'
+import { sfx } from '@/lib/sound'
 import { useWide } from '@/composables/useBreakpoint'
 import { useAuth } from '@/stores/auth'
 import { useCall } from '@/stores/call'
@@ -207,17 +209,17 @@ onBeforeUnmount(() => {
 // ---- reply / edit / menu ------------------------------------------------------
 const replyTo = ref<Message | null>(null)
 const editing = ref<Message | null>(null)
-const menu = ref<{ msg: Message; x: number; y: number; rect: DOMRect } | null>(null)
+const menu = ref<{ msg: Message; x: number; y: number; rect: DOMRect; emojiGrid: boolean } | null>(null)
 const root = ref<HTMLElement | null>(null)
 const infoOpen = ref(false)
 
-function openMenu(msg: Message, x: number, y: number) {
+function openMenu(msg: Message, x: number, y: number, emojiGrid = false) {
   if (!root.value) return
-  menu.value = { msg, x, y, rect: root.value.getBoundingClientRect() }
+  menu.value = { msg, x, y, rect: root.value.getBoundingClientRect(), emojiGrid }
 }
 
-async function onMenuAction(action: 'reply' | 'copy' | 'edit' | 'forward' | 'delete') {
-  const msg = menu.value?.msg
+async function onMenuAction(action: MessageAction, target?: Message) {
+  const msg = target ?? menu.value?.msg
   menu.value = null
   if (!msg) return
   switch (action) {
@@ -236,6 +238,7 @@ async function onMenuAction(action: 'reply' | 'copy' | 'edit' | 'forward' | 'del
 
 function onReact(msg: Message, emoji: string) {
   menu.value = null
+  sfx.pop()
   void messages.toggleReaction(msg, emoji)
 }
 
@@ -260,7 +263,7 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
     ref="root" class="chat"
     @dragover.prevent="dragOver = true" @dragleave.self="dragOver = false" @drop.prevent="onDrop"
   >
-    <div class="wallpaper" />
+    <div class="wallpaper" :class="{ custom: !!settings.wallpaper }" :style="settings.wallpaper ? { backgroundImage: `url(&quot;${settings.wallpaper}&quot;)` } : undefined" />
 
     <header class="head">
       <button v-if="!wide" v-ripple class="icon-btn" :title="$t('common.back')" @click="goBack">
@@ -318,7 +321,8 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
             :lifted="menu?.msg.id === row.msg.id"
             :highlight="highlightId === row.msg.id"
             :animate="animateIds.has(row.msg.id)"
-            @menu="(x, y) => openMenu(row.msg, x, y)"
+            @menu="(x, y, grid) => openMenu(row.msg, x, y, grid)"
+            @action="(a) => onMenuAction(a, row.msg)"
             @reply="editing = null; replyTo = row.msg"
             @react="(e) => onReact(row.msg, e)"
             @retry="messages.retry(row.msg)"
@@ -344,7 +348,7 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
     </footer>
 
     <MessageMenu
-      v-if="menu" :msg="menu.msg" :x="menu.x" :y="menu.y" :container="menu.rect"
+      v-if="menu" :msg="menu.msg" :x="menu.x" :y="menu.y" :container="menu.rect" :emoji-grid="menu.emojiGrid"
       :mine="menu.msg.sender_id === auth.userId"
       @close="menu = null" @action="onMenuAction" @react="(e) => onReact(menu!.msg, e)"
     />
@@ -368,6 +372,8 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
   opacity: var(--pattern-opacity);
 }
 :root[data-theme='dark'] .wallpaper::after { filter: invert(1); }
+.wallpaper.custom { background-size: cover; background-position: center; }
+.wallpaper.custom::after { display: none; }
 
 .head {
   position: relative; z-index: 2; display: flex; align-items: center; gap: 4px;

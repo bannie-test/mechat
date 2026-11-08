@@ -39,6 +39,8 @@ export default {
     },
   },
   chat: {
+    sending: 'Sending…',
+    notSent: 'Not sent',
     selectChat: 'Select a chat to start messaging',
     emptyList: 'No chats yet',
     noMessages: 'No messages yet',
@@ -77,7 +79,7 @@ export default {
     member_left: '{name} left the group',
   },
   menu: {
-    reply: 'Reply', copy: 'Copy', edit: 'Edit', forward: 'Forward', delete: 'Delete', forwardTo: 'Forward to…',
+    react: 'React', more: 'More', moreReactions: 'More reactions', reply: 'Reply', copy: 'Copy', edit: 'Edit', forward: 'Forward', delete: 'Delete', forwardTo: 'Forward to…',
   },
   attach: { photo: 'Photo', file: 'File' },
   emoji: {
@@ -192,6 +194,18 @@ export default {
   },
   settings: {
     title: 'Settings',
+    accent: 'Theme color',
+    customColor: 'Custom color',
+    wallpaper: 'Chat background',
+    wallpaperUpload: 'Upload picture',
+    wallpaperReset: 'Use default',
+    wallpaperTooBig: 'That picture is too large to keep on this device',
+    reactions: 'Quick reactions',
+    reactionsHint: 'Tap one to replace it',
+    reset: 'Reset',
+    sounds: 'Sounds',
+    soundTitle: 'In-app sounds',
+    soundHint: 'Messages, uploads and emoji taps',
     name: 'Name',
     username: 'Username',
     bio: 'Bio',

@@ -5,11 +5,9 @@ import { colorFor, formatDuration, initials } from '@/lib/format'
 import { canShareScreen } from '@/lib/call/media'
 import { tones } from '@/lib/call/sound'
 import { vibrate } from '@/lib/motion'
-import { uploadAttachment } from '@/lib/storage'
 import { useAuth } from '@/stores/auth'
 import { useCall } from '@/stores/call'
 import { useChats } from '@/stores/chats'
-import { useMessages } from '@/stores/messages'
 import { useUi } from '@/stores/ui'
 import Avatar from '@/components/Avatar.vue'
 import Icon from '@/components/Icon.vue'
@@ -304,19 +302,6 @@ async function snap() {
   call.notifyScreenshot()
 }
 
-function sendShot() {
-  const s = shot.value
-  const id = call.chatId
-  if (!s || !id) return
-  void useMessages().send(
-    id,
-    { kind: 'image', attachment: { width: s.width, height: s.height, mime: 'image/jpeg', size: s.blob.size, name: s.name }, localUrl: s.url },
-    () => uploadAttachment(id, s.blob, s.name),
-  )
-  shot.value = null // the message keeps using the preview URL
-  ui.toast(t('call.screenshotSent'), undefined, 2000)
-}
-
 async function saveShot() {
   const s = shot.value
   if (!s) return
@@ -433,8 +418,7 @@ onBeforeUnmount(closeShot)
           <div v-if="shot" class="shot" @click.stop>
             <img :src="shot.url" alt="" />
             <div class="shot-actions">
-              <button class="chip primary" @click="sendShot"><Icon name="send" :size="16" />{{ t('call.send') }}</button>
-              <button class="chip" @click="saveShot"><Icon name="download" :size="16" />{{ t('call.save') }}</button>
+              <button class="chip primary" @click="saveShot"><Icon name="download" :size="16" />{{ t('call.save') }}</button>
               <button class="chip icon" :title="t('common.close')" @click="closeShot"><Icon name="close" :size="16" /></button>
             </div>
           </div>
@@ -469,7 +453,7 @@ onBeforeUnmount(closeShot)
 .stage { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .hero {
   position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; padding: 0 24px 140px; text-align: center; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+  gap: 6px; padding: 0 24px 140px; text-align: center; pointer-events: none; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
 }
 .hero-name { margin-top: 22px; font-size: 26px; font-weight: 700; max-width: 100%; }
 .hero-status { font-size: 16px; opacity: 0.85; font-variant-numeric: tabular-nums; }
@@ -500,7 +484,7 @@ onBeforeUnmount(closeShot)
 .mini-tile :deep(.label) { font-size: 11px; padding: 2px 6px; left: 4px; bottom: 4px; }
 
 .top {
-  position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 8px;
+  position: absolute; z-index: 5; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 8px;
   padding: calc(10px + var(--safe-top)) 12px 18px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent);
 }
 .title { flex: 1; min-width: 0; display: grid; justify-items: center; text-align: center; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); }
@@ -526,7 +510,7 @@ onBeforeUnmount(closeShot)
 .pip-talk { position: absolute; inset: 0; border-radius: 16px; box-shadow: inset 0 0 0 3px #4ade80; pointer-events: none; }
 
 .controls {
-  position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: clamp(10px, 4vw, 26px);
+  position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: clamp(10px, 4vw, 26px);
   padding: 22px 12px calc(18px + var(--safe-bottom)); background: linear-gradient(0deg, rgba(0, 0, 0, 0.5), transparent);
   transition: transform 0.3s var(--ease-out), opacity 0.3s;
 }

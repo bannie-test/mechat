@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { formatDuration } from '@/lib/format'
 import { resizeImage, uploadAttachment } from '@/lib/storage'
 import { vibrate } from '@/lib/motion'
+import { sfx } from '@/lib/sound'
 import type { Attachment, Message } from '@/lib/types'
 import { useRecorder } from '@/composables/useRecorder'
 import { useWide } from '@/composables/useBreakpoint'
@@ -67,10 +68,28 @@ function autosize() {
   el.style.height = `${Math.min(el.scrollHeight, 180)}px`
 }
 
+function insertText(s: string) {
+  const el = input.value
+  if (!el) return void (text.value += s)
+  const start = el.selectionStart ?? text.value.length
+  const end = el.selectionEnd ?? start
+  text.value = text.value.slice(0, start) + s + text.value.slice(end)
+  void nextTick(() => {
+    el.setSelectionRange(start + s.length, start + s.length)
+    autosize()
+  })
+}
+
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && wide.value) {
-    e.preventDefault()
-    void submit()
+  if (e.key === 'Enter' && !e.isComposing) {
+    // Enter sends; Alt+Enter (or Shift+Enter) starts a new line.
+    if (e.altKey) {
+      e.preventDefault()
+      insertText('\n')
+    } else if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      void submit()
+    }
   } else if (e.key === 'Escape' && (props.editing || props.replyTo)) {
     emit('cancel')
   } else if (e.key === 'ArrowUp' && !text.value && !props.editing) {
@@ -88,6 +107,7 @@ function onKeydown(e: KeyboardEvent) {
 async function submit() {
   const body = text.value.trim()
   if (!body) return
+  showEmoji.value = false
   if (props.editing) {
     const m = props.editing
     emit('cancel')
@@ -100,6 +120,7 @@ async function submit() {
   realtime.stopTyping(props.chatId)
   const reply = props.replyTo?.id ?? null
   emit('sent')
+  sfx.sent()
   await messages.send(props.chatId, { kind: 'text', content: body, reply_to_id: reply })
   input.value?.focus()
 }
@@ -155,23 +176,19 @@ defineExpose({ onDrop })
 
 async function sendSticker(s: string) {
   showEmoji.value = false
+  sfx.sent()
   emit('sent')
   await messages.send(props.chatId, { kind: 'sticker', content: s, reply_to_id: props.replyTo?.id ?? null })
 }
 async function sendGif(a: Attachment) {
   showEmoji.value = false
+  sfx.sent()
   emit('sent')
   await messages.send(props.chatId, { kind: 'gif', attachment: a, reply_to_id: props.replyTo?.id ?? null })
 }
 function insertEmoji(e: string) {
-  const el = input.value
-  if (!el) return void (text.value += e)
-  const start = el.selectionStart ?? text.value.length
-  const end = el.selectionEnd ?? start
-  text.value = text.value.slice(0, start) + e + text.value.slice(end)
-  void nextTick(() => {
-    el.setSelectionRange(start + e.length, start + e.length)
-  })
+  sfx.pop()
+  insertText(e)
 }
 
 // ---- voice -------------------------------------------------------------------

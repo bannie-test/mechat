@@ -5,6 +5,7 @@ import { formatBytes, formatTime, isOnlyEmoji, linkify } from '@/lib/format'
 import { signedUrl } from '@/lib/storage'
 import { vibrate } from '@/lib/motion'
 import { onLongPress } from '@/composables/useLongPress'
+import { messageActions, type MessageAction } from '@/lib/messageActions'
 import type { ChatType, Message, Reaction } from '@/lib/types'
 import { useAuth } from '@/stores/auth'
 import { useChats } from '@/stores/chats'
@@ -30,12 +31,13 @@ const props = defineProps<{
   animate?: boolean
 }>()
 const emit = defineEmits<{
-  menu: [x: number, y: number]
+  menu: [x: number, y: number, emojiGrid?: boolean]
   reply: []
   react: [emoji: string]
   retry: []
   jump: [id: string]
   open: [src: string]
+  action: [name: MessageAction]
 }>()
 
 const { t } = useI18n()
@@ -50,6 +52,8 @@ const showAvatar = computed(() => props.chatType === 'group' && !mine.value)
 const bigEmoji = computed(() => props.msg.kind === 'text' && isOnlyEmoji(props.msg.content ?? ''))
 const bare = computed(() => props.msg.kind === 'sticker' || bigEmoji.value)
 const segments = computed(() => linkify(props.msg.content ?? ''))
+const actions = computed(() => messageActions(props.msg, mine.value))
+const hoverable = computed(() => !props.msg._status && props.msg.kind !== 'system')
 
 const grouped = computed(() => {
   const map = new Map<string, { emoji: string; count: number; mine: boolean; users: string[] }>()
@@ -155,7 +159,7 @@ onBeforeUnmount(() => unbind?.())
         <div v-else-if="msg.kind === 'sticker'" class="sticker">{{ msg.content }}</div>
         <VoicePlayer v-else-if="msg.kind === 'voice'" :attachment="msg.attachment" :local-url="msg._localUrl" :mine="mine" />
         <button v-else-if="msg.kind === 'file'" class="file" @click.stop="download">
-          <span class="file-icon"><Icon :name="msg._status === 'sending' ? 'clock' : 'download'" /></span>
+          <span class="file-icon"><span v-if="msg._status === 'sending'" class="spinner file-spin" /><Icon v-else name="download" /></span>
           <span class="file-meta">
             <span class="ellipsis">{{ msg.attachment?.name }}</span>
             <small>{{ formatBytes(msg.attachment?.size) }}</small>
@@ -168,8 +172,8 @@ onBeforeUnmount(() => unbind?.())
           <span v-if="msg.edited_at" class="edited">{{ $t('chat.edited') }}</span>
           {{ formatTime(msg.created_at, settings.locale) }}
           <template v-if="mine">
-            <button v-if="msg._status === 'failed'" class="failed" :title="$t('chat.retry')" @click.stop="emit('retry')"><Icon name="alert" :size="16" /></button>
-            <Icon v-else-if="msg._status === 'sending'" name="clock" :size="14" />
+            <button v-if="msg._status === 'failed'" class="failed" :title="$t('chat.retry')" @click.stop="emit('retry')"><Icon name="alert" :size="16" />{{ $t('chat.notSent') }}</button>
+            <span v-else-if="msg._status === 'sending'" class="sending" :title="$t('chat.sending')"><i /></span>
             <Icon v-else :name="read ? 'checks' : 'check'" :size="16" />
           </template>
         </span>
@@ -184,6 +188,25 @@ onBeforeUnmount(() => unbind?.())
           <span>{{ g.emoji }}</span><small v-if="g.count > 1">{{ g.count }}</small>
         </button>
       </TransitionGroup>
+
+      <div v-if="hoverable" class="hover-bar" data-no-swipe @pointerdown.stop>
+        <div class="hb-item">
+          <button class="hb-btn" :title="$t('menu.react')"><Icon name="smile" :size="18" /></button>
+          <div class="hb-pop hb-emoji">
+            <button v-for="e in settings.quickReactions" :key="e" class="hb-e" @click.stop="emit('react', e)">{{ e }}</button>
+            <button class="hb-e hb-plus" :title="$t('menu.moreReactions')" @click.stop="(ev) => emit('menu', ev.clientX, ev.clientY, true)"><Icon name="plus" :size="18" /></button>
+          </div>
+        </div>
+        <button class="hb-btn" :title="$t('menu.reply')" @click.stop="emit('reply')"><Icon name="reply" :size="18" /></button>
+        <div class="hb-item">
+          <button class="hb-btn" :title="$t('menu.more')" @click.stop="(ev) => emit('menu', ev.clientX, ev.clientY)"><Icon name="more" :size="18" /></button>
+          <div class="hb-pop hb-actions">
+            <button v-for="a in actions" :key="a.name" :class="{ danger: a.danger }" @click.stop="emit('action', a.name)">
+              <Icon :name="a.icon" :size="18" />{{ $t(`menu.${a.name}`) }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <span class="reply-hint" :style="{ opacity: Math.min(1, -dx / 56), transform: `scale(${0.6 + Math.min(1, -dx / 56) * 0.4})` }">
@@ -232,6 +255,7 @@ onBeforeUnmount(() => unbind?.())
 .caption { display: block; padding: 4px 7px 0; }
 .text::after { content: ''; display: inline-block; width: var(--meta-w, 58px); }
 .mine .text::after { --meta-w: 76px; }
+.row:has(.failed) .text::after { --meta-w: 130px; }
 .text.big::after { display: none; }
 .sticker { font-size: 96px; line-height: 1.1; padding: 4px; }
 
@@ -247,11 +271,54 @@ onBeforeUnmount(() => unbind?.())
 .bare .meta.overlay { right: 2px; bottom: 2px; }
 .voice + .meta, .file + .meta, .call-log + .meta { float: none; display: flex; justify-content: flex-end; margin: 2px 0 0; bottom: 0; }
 .edited { font-style: italic; }
-.failed { color: var(--danger); display: inline-grid; }
+.failed { color: var(--danger); display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; }
+.sending { display: inline-grid; place-items: center; width: 14px; height: 14px; }
+.sending i {
+  width: 11px; height: 11px; border-radius: 50%; border: 1.6px solid currentColor; border-right-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.row:has(.sending) .bubble { opacity: 0.85; }
+
+/* Desktop hover toolbar: emoji strip and action list open on hover. */
+.swipe { position: relative; }
+.hover-bar {
+  position: absolute; top: 50%; left: 100%; transform: translateY(-50%);
+  display: none; gap: 2px; padding: 2px; margin: 0 6px; border-radius: 18px; white-space: nowrap;
+  background: var(--surface); box-shadow: var(--shadow); opacity: 0; transition: opacity 0.12s;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hover-bar { display: flex; }
+  .row:hover .hover-bar, .hover-bar:focus-within { opacity: 1; }
+  .row:hover { z-index: 4; }
+}
+.mine .hover-bar { left: auto; right: 100%; }
+.row.lifted .hover-bar { opacity: 0 !important; pointer-events: none; }
+.hb-item { position: relative; }
+.hb-btn { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--text-muted); }
+.hb-btn:hover { background: var(--hover); color: var(--accent); }
+.hb-pop {
+  position: absolute; bottom: 100%; z-index: 20; display: none; padding: 4px; margin-bottom: 6px; border-radius: 22px;
+  background: var(--surface); box-shadow: var(--shadow-lg); animation: hb-in 0.14s var(--ease-out);
+}
+/* invisible bridge so the pointer can travel from the button to the popover */
+.hb-pop::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
+.hb-item:hover .hb-pop { display: flex; }
+.mine .hb-pop { right: -4px; }
+.row:not(.mine) .hb-pop { left: -4px; }
+@keyframes hb-in { from { opacity: 0; transform: translateY(4px) scale(0.95); } }
+.hb-e { width: 36px; height: 36px; border-radius: 50%; font-size: 22px; transition: transform 0.12s var(--ease-out); }
+.hb-e:hover { transform: scale(1.25); }
+.hb-plus { display: grid; place-items: center; font-size: 0; color: var(--text-muted); background: var(--surface-2); }
+.hb-actions { flex-direction: column; min-width: 170px; border-radius: 12px; padding: 4px; }
+.hb-actions button { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; font-size: 14px; font-weight: 500; text-align: left; white-space: nowrap; }
+.hb-actions button:hover { background: var(--hover); }
+.hb-actions .danger { color: var(--danger); }
 
 .file { display: flex; align-items: center; gap: 10px; text-align: left; min-width: 200px; padding: 2px 0; }
 .file-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; flex: none; }
 .file-meta { display: grid; min-width: 0; }
+.file-spin { width: 22px; height: 22px; border-width: 2.5px; border-color: currentColor; border-right-color: transparent; }
 .file-meta small { color: var(--bubble-meta); }
 
 .reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }

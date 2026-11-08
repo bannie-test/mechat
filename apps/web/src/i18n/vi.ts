@@ -40,6 +40,8 @@ const vi: typeof en = {
     },
   },
   chat: {
+    sending: 'Đang gửi…',
+    notSent: 'Chưa gửi được',
     selectChat: 'Chọn một cuộc trò chuyện để bắt đầu',
     emptyList: 'Chưa có cuộc trò chuyện nào',
     noMessages: 'Chưa có tin nhắn',
@@ -78,7 +80,7 @@ const vi: typeof en = {
     member_left: '{name} đã rời nhóm',
   },
   menu: {
-    reply: 'Trả lời', copy: 'Sao chép', edit: 'Sửa', forward: 'Chuyển tiếp', delete: 'Xoá', forwardTo: 'Chuyển tiếp tới…',
+    react: 'Bày tỏ cảm xúc', more: 'Thêm', moreReactions: 'Thêm cảm xúc', reply: 'Trả lời', copy: 'Sao chép', edit: 'Sửa', forward: 'Chuyển tiếp', delete: 'Xoá', forwardTo: 'Chuyển tiếp tới…',
   },
   attach: { photo: 'Ảnh', file: 'Tệp' },
   emoji: {
@@ -193,6 +195,18 @@ const vi: typeof en = {
   },
   settings: {
     title: 'Cài đặt',
+    accent: 'Màu chủ đề',
+    customColor: 'Màu tuỳ chỉnh',
+    wallpaper: 'Hình nền trò chuyện',
+    wallpaperUpload: 'Tải ảnh lên',
+    wallpaperReset: 'Dùng mặc định',
+    wallpaperTooBig: 'Ảnh quá lớn để lưu trên thiết bị này',
+    reactions: 'Cảm xúc nhanh',
+    reactionsHint: 'Chạm vào một biểu tượng để thay',
+    reset: 'Đặt lại',
+    sounds: 'Âm thanh',
+    soundTitle: 'Âm thanh trong ứng dụng',
+    soundHint: 'Tin nhắn, tải tệp và chọn biểu tượng',
     name: 'Tên',
     username: 'Tên người dùng',
     bio: 'Giới thiệu',

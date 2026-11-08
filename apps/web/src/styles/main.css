@@ -59,6 +59,22 @@
   color-scheme: dark;
 }
 
+/* Custom accent picked in Settings (set from JS as --custom-accent / --custom-on-accent). */
+:root[data-accent] {
+  --accent: var(--custom-accent);
+  --accent-hover: color-mix(in srgb, var(--custom-accent) 85%, #000);
+  --on-accent: var(--custom-on-accent);
+  --bubble-out: color-mix(in srgb, var(--custom-accent) 16%, #fff);
+  --bubble-out-text: #0f1419;
+  --bubble-out-meta: color-mix(in srgb, var(--custom-accent) 75%, #000);
+}
+:root[data-accent][data-theme='dark'] {
+  --accent-hover: color-mix(in srgb, var(--custom-accent) 85%, #fff);
+  --bubble-out: color-mix(in srgb, var(--custom-accent) 42%, #17212b);
+  --bubble-out-text: #ffffff;
+  --bubble-out-meta: color-mix(in srgb, var(--custom-accent) 35%, #fff);
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #app { height: 100%; }
 html { -webkit-text-size-adjust: 100%; }

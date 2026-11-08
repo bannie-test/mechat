@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { reactive } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { copyAttachment, removeAttachment } from '@/lib/storage'
+import { sfx } from '@/lib/sound'
 import type { Attachment, Message, MessageKind, Reaction } from '@/lib/types'
 import { useAuth } from './auth'
 import { useChats } from './chats'
@@ -135,6 +136,7 @@ export const useMessages = defineStore('messages', () => {
       if (error) throw error
       upsert({ ...(data as Message), _status: undefined })
       useChats().onMessageInsert(data as Message)
+      if (prepare) sfx.uploaded()
     } catch (e) {
       console.error('send failed', e)
       const cur = bucket(msg.chat_id).items.find((m) => m.id === msg.id)
@@ -227,6 +229,10 @@ export const useMessages = defineStore('messages', () => {
 
   // ---- realtime ------------------------------------------------------------
   function onRemote(type: 'INSERT' | 'UPDATE', msg: Message) {
+    if (type === 'INSERT' && msg.sender_id !== useAuth().userId && msg.kind !== 'system' && msg.kind !== 'call' && !find(msg.id)) {
+      const chat = useChats().byId(msg.chat_id)
+      if (!chat?.muted) sfx.incoming()
+    }
     if (msg.id in extras) extras[msg.id] = msg
     const b = byChat[msg.chat_id]
     if (b?.loaded) upsert(msg)
