@@ -21,6 +21,8 @@ import Composer from './Composer.vue'
 import Icon from './Icon.vue'
 import MessageBubble from './MessageBubble.vue'
 import MessageMenu from './MessageMenu.vue'
+import RainOverlay from './RainOverlay.vue'
+import WeatherCard from './WeatherCard.vue'
 
 const props = defineProps<{ chatId: string }>()
 
@@ -74,6 +76,7 @@ const headerOnline = computed(() => chat.value?.type === 'direct' && realtime.on
 type Row =
   | { type: 'date'; key: string; label: string }
   | { type: 'system'; key: string; msg: Message }
+  | { type: 'weather'; key: string; msg: Message }
   | { type: 'msg'; key: string; msg: Message; first: boolean; last: boolean }
 
 const rows = computed<Row[]>(() => {
@@ -86,14 +89,14 @@ const rows = computed<Row[]>(() => {
     if (!prev || !isSameDay(new Date(prev.created_at), new Date(m.created_at))) {
       out.push({ type: 'date', key: `d-${m.created_at.slice(0, 10)}-${m.id}`, label: formatDay(m.created_at, settings.locale, t('chat.today'), t('chat.yesterday')) })
     }
-    if (m.kind === 'system') {
-      out.push({ type: 'system', key: m.id, msg: m })
+    if (m.kind === 'system' || m.kind === 'weather') {
+      out.push({ type: m.kind, key: m.id, msg: m } as Row)
       continue
     }
-    const sameAsPrev = prev && prev.kind !== 'system' && prev.sender_id === m.sender_id &&
+    const sameAsPrev = prev && prev.kind !== 'system' && prev.kind !== 'weather' && prev.sender_id === m.sender_id &&
       isSameDay(new Date(prev.created_at), new Date(m.created_at)) &&
       new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60_000
-    const sameAsNext = next && next.kind !== 'system' && next.sender_id === m.sender_id &&
+    const sameAsNext = next && next.kind !== 'system' && next.kind !== 'weather' && next.sender_id === m.sender_id &&
       isSameDay(new Date(next.created_at), new Date(m.created_at)) &&
       new Date(next.created_at).getTime() - new Date(m.created_at).getTime() < 5 * 60_000
     out.push({ type: 'msg', key: m.id, msg: m, first: !sameAsPrev, last: !sameAsNext })
@@ -255,6 +258,18 @@ function onDrop(e: DragEvent) {
   composer.value?.onDrop(e)
 }
 
+// ---- /weather card + rain effect ----------------------------------------------
+const rain = ref<{ key: number; storm: boolean } | null>(null)
+async function onWeatherLoaded(effect: 'rain' | 'storm' | null) {
+  await nextTick()
+  scrollToBottom(true)
+  if (effect) rain.value = { key: Date.now(), storm: effect === 'storm' }
+}
+function retryWeather(msg: Message) {
+  messages.discard(msg)
+  void messages.postWeather(props.chatId, settings.locale)
+}
+
 const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_count ?? 0))
 </script>
 
@@ -308,6 +323,10 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
         <template v-for="row in rows" :key="row.key">
           <div v-if="row.type === 'date'" class="day"><span>{{ row.label }}</span></div>
           <div v-else-if="row.type === 'system'" class="day system"><span>{{ systemText(row.msg) }}</span></div>
+          <WeatherCard
+            v-else-if="row.type === 'weather'" :msg="row.msg"
+            @close="messages.discard(row.msg)" @retry="retryWeather(row.msg)" @loaded="onWeatherLoaded"
+          />
           <MessageBubble
             v-else
             :data-id="row.msg.id"
@@ -352,6 +371,8 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
       :mine="menu.msg.sender_id === auth.userId"
       @close="menu = null" @action="onMenuAction" @react="(e) => onReact(menu!.msg, e)"
     />
+
+    <RainOverlay v-if="rain" :key="rain.key" :storm="rain.storm" @done="rain = null" />
 
     <Transition name="fade">
       <div v-if="dragOver" class="drop"><span>{{ $t('chat.dropFiles') }}</span></div>
