@@ -9,7 +9,7 @@ import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { vibrate } from '@/lib/motion'
 
 const LEN = 6
-const props = defineProps<{ modelValue: string; disabled?: boolean; shake?: number }>()
+const props = defineProps<{ modelValue: string; disabled?: boolean; checking?: boolean; shake?: number }>()
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 
 const W = 320
@@ -373,7 +373,10 @@ const ease = (x: number) => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1,
         <circle cx="20" cy="10" r="7" class="wheel" />
       </g>
     </svg>
-    <p class="hint muted">{{ $t('login.game.hint') }}</p>
+    <p class="hint muted" aria-live="polite">
+      <template v-if="checking"><span class="spinner" />{{ $t('login.game.checking') }}</template>
+      <template v-else>{{ $t('login.game.hint') }}</template>
+    </p>
   </div>
 </template>
 
@@ -410,5 +413,6 @@ const ease = (x: number) => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1,
 .barrel .lip { fill: #2b303b; }
 .base { fill: #59627a; }
 .wheel { fill: #2b303b; stroke: #8a93a8; stroke-width: 3; }
-.hint { margin: 0; text-align: center; font-size: 13px; }
+.hint { margin: 0; text-align: center; font-size: 13px; text-wrap: balance; }
+.hint .spinner { display: inline-block; width: 12px; height: 12px; border-width: 2px; margin-right: 6px; vertical-align: -1px; }
 </style>

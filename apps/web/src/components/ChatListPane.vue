@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { callLogInfo } from '@/lib/call/labels'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { supabase } from '@/lib/supabase'
@@ -108,9 +108,9 @@ watch(query, (v) => {
 
 async function openSearch() {
   searching.value = true
-  await nextTick()
-  searchInput.value?.focus()
 }
+// The input only mounts after the header's out-in fade, so focus it when it appears.
+watch(searchInput, (el) => el?.focus())
 function closeSearch() {
   searching.value = false
   query.value = ''

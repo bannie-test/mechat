@@ -28,21 +28,22 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="overlay" @click="emit('close')" @contextmenu.prevent="emit('close')">
-    <div
-      ref="el" class="menu" :style="{ left: pos.left + 'px', top: pos.top + 'px', transformOrigin: pos.origin }"
-      @click.stop
-    >
-      <div v-if="!msg._status" class="reactions">
-        <button v-for="(e, i) in QUICK_REACTIONS" :key="e" class="react" :style="{ animationDelay: i * 25 + 'ms' }" @click="emit('react', e)">{{ e }}</button>
-      </div>
-      <div class="actions">
-        <button v-if="!msg._status" v-ripple @click="emit('action', 'reply')"><Icon name="reply" :size="20" />{{ $t('menu.reply') }}</button>
-        <button v-if="canCopy" v-ripple @click="emit('action', 'copy')"><Icon name="copy" :size="20" />{{ $t('menu.copy') }}</button>
-        <button v-if="canEdit" v-ripple @click="emit('action', 'edit')"><Icon name="edit" :size="20" />{{ $t('menu.edit') }}</button>
-        <button v-if="!msg._status && msg.kind !== 'call'" v-ripple @click="emit('action', 'forward')"><Icon name="forward" :size="20" />{{ $t('menu.forward') }}</button>
-        <button v-if="mine" v-ripple class="danger" @click="emit('action', 'delete')"><Icon name="trash" :size="20" />{{ $t('menu.delete') }}</button>
-      </div>
+  <!-- Siblings, not nested: the overlay is its own stacking context, so a menu inside it would sit
+       below the lifted message bubble (z 31) and the bubble would cover the reactions. -->
+  <div class="overlay" @click="emit('close')" @contextmenu.prevent="emit('close')" />
+  <div
+    ref="el" class="menu" :style="{ left: pos.left + 'px', top: pos.top + 'px', transformOrigin: pos.origin }"
+    @contextmenu.prevent
+  >
+    <div v-if="!msg._status" class="reactions">
+      <button v-for="(e, i) in QUICK_REACTIONS" :key="e" class="react" :style="{ animationDelay: i * 25 + 'ms' }" @click="emit('react', e)">{{ e }}</button>
+    </div>
+    <div class="actions">
+      <button v-if="!msg._status" v-ripple @click="emit('action', 'reply')"><Icon name="reply" :size="20" />{{ $t('menu.reply') }}</button>
+      <button v-if="canCopy" v-ripple @click="emit('action', 'copy')"><Icon name="copy" :size="20" />{{ $t('menu.copy') }}</button>
+      <button v-if="canEdit" v-ripple @click="emit('action', 'edit')"><Icon name="edit" :size="20" />{{ $t('menu.edit') }}</button>
+      <button v-if="!msg._status && msg.kind !== 'call'" v-ripple @click="emit('action', 'forward')"><Icon name="forward" :size="20" />{{ $t('menu.forward') }}</button>
+      <button v-if="mine" v-ripple class="danger" @click="emit('action', 'delete')"><Icon name="trash" :size="20" />{{ $t('menu.delete') }}</button>
     </div>
   </div>
 </template>

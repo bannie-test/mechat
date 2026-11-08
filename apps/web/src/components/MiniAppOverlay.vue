@@ -122,7 +122,7 @@ const title = computed(() => (app.value ? miniapps.label(app.value, settings.loc
           <iframe
             v-if="src" ref="iframe" :key="src" :src="src" :title="title"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-            allow="clipboard-write; vibrate; fullscreen"
+            allow="clipboard-write; fullscreen"
             @load="onIframeLoad" @error="failed = true"
           />
           <p v-else-if="miniapps.loaded" class="center muted">{{ $t('apps.notFound') }}</p>

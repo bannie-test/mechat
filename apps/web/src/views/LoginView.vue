@@ -23,6 +23,7 @@ const code = ref('')
 const busy = ref(false)
 const error = ref('')
 const codeInput = ref<HTMLInputElement | null>(null)
+const pond = ref<HTMLElement | null>(null)
 const cooldown = ref(0)
 
 /** Shoot balloons to enter the code; typing is the fallback (and the default with reduced motion). */
@@ -105,6 +106,12 @@ async function verify() {
 async function diveIn() {
   if (reducedMotion()) return
   await sleep(game.value ? 650 : 150) // let the balloon firework play
+  // Short screens (laptops) can have him below the fold during the code step: show him first.
+  const r = pond.value?.getBoundingClientRect()
+  if (r && r.bottom > window.innerHeight + 8) {
+    pond.value!.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    await sleep(500)
+  }
   diving.value = true
   setTimeout(() => (splash.value = true), 620)
   await sleep(900)
@@ -181,7 +188,7 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
             <p>{{ $t('login.codeSent', { email }) }}</p>
 
             <Transition name="fade" mode="out-in">
-              <BalloonGame v-if="game" key="game" v-model="code" :disabled="busy || diving" :shake="shakeGame" />
+              <BalloonGame v-if="game" key="game" v-model="code" :disabled="busy || diving" :checking="busy" :shake="shakeGame" />
               <div v-else key="type" class="stack">
                 <input
                   ref="codeInput" v-model="code" class="code" inputmode="numeric" autocomplete="one-time-code"
@@ -194,7 +201,7 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
             <button class="mode-link" type="button" @click="game ? useKeyboard() : (game = true)">
               {{ game ? $t('login.game.typeInstead') : $t('login.game.playInstead') }}
             </button>
-            <button v-if="!game || busy" class="btn block" :disabled="code.length < 6 || busy" @click="verify">
+            <button v-if="!game" class="btn block" :disabled="code.length < 6 || busy" @click="verify">
               <span v-if="busy" class="spinner" />{{ $t('login.verify') }}
             </button>
             <div class="row">
@@ -215,7 +222,7 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
       </div>
 
       <!-- The capybara's corner of the pool. Ripples share the drift animation so they stay under him. -->
-      <div class="pond">
+      <div ref="pond" class="pond">
         <div class="drift" :class="{ stop: diving }">
           <Capybara :mood="mood" />
         </div>
@@ -270,20 +277,21 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
 @keyframes float { 50% { transform: translateY(-6px); } }
 h1 { margin: 0; font-size: 26px; }
 .compact h1 { font-size: 20px; }
-.stack { display: grid; gap: 12px; text-align: left; }
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; text-align: left; min-width: 0; }
+.card { grid-template-columns: minmax(0, 1fr); }
 .stack > p { margin: 0; text-align: center; }
 .tabs { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 10px; padding: 3px; }
 .tabs button { position: relative; z-index: 1; height: 36px; border-radius: 8px; font-weight: 600; color: var(--text-muted); transition: color 0.2s; }
 .tabs button.on { color: var(--text); }
 .ink { position: absolute; left: 3px; top: 3px; width: calc(50% - 3px); height: 36px; border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); transition: transform 0.3s var(--ease-out); }
 .code {
-  height: 60px; border-radius: 12px; border: 2px solid var(--border); background: transparent; text-align: center;
+  width: 100%; min-width: 0; box-sizing: border-box; height: 60px; border-radius: 12px; border: 2px solid var(--border); background: transparent; text-align: center;
   font: 600 30px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 12px; outline: none; transition: border-color 0.2s;
 }
 .code:focus { border-color: var(--accent); }
 .small { font-size: 13px; }
 .mode-link { justify-self: center; color: var(--accent); font-size: 14px; font-weight: 600; padding: 2px 8px; }
-.row { display: flex; justify-content: space-between; }
+.row { display: flex; flex-wrap: wrap; gap: 4px; justify-content: space-between; }
 .error { margin: 0; color: var(--danger); }
 .lang { display: flex; justify-content: center; gap: 8px; color: var(--text-muted); font-size: 14px; }
 .lang button.on { color: var(--accent); font-weight: 600; }

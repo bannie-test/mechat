@@ -28,6 +28,7 @@ const vi: typeof en = {
     resendIn: 'Gửi lại sau {s}s',
     game: {
       hint: 'Chạm vào bóng bay để bắn mã trong email nhé 🎯',
+      checking: 'Đang kiểm tra mã…',
       back: 'Xoá số cuối',
       typeInstead: 'Nhập mã bằng bàn phím',
       playInstead: 'Bắn bóng bay để nhập mã 🎈',

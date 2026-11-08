@@ -52,7 +52,7 @@ export async function removeAttachment(path: string) {
 export async function uploadAvatar(userId: string, file: Blob): Promise<string> {
   const resized = await resizeImage(file, 512, 0.85)
   const path = `${userId}/${Date.now()}.jpg`
-  const { error } = await supabase.storage.from('avatars').upload(path, resized.blob, { contentType: 'image/jpeg', upsert: true })
+  const { error } = await supabase.storage.from('avatars').upload(path, resized.blob, { contentType: 'image/jpeg' })
   if (error) throw error
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
 }
