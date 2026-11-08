@@ -1,5 +1,5 @@
 export type ChatType = 'direct' | 'group'
-export type MessageKind = 'text' | 'image' | 'file' | 'voice' | 'sticker' | 'gif' | 'system' | 'call'
+export type MessageKind = 'text' | 'image' | 'file' | 'voice' | 'sticker' | 'gif' | 'system' | 'call' | 'weather'
 export type Locale = 'en' | 'vi'
 
 export interface Profile {
@@ -52,6 +52,8 @@ export interface Message {
   /** Local-only fields. */
   _status?: 'sending' | 'failed'
   _localUrl?: string
+  /** Only on this device, never sent (e.g. the weather card from /weather). */
+  _local?: boolean
 }
 
 export interface Reaction {

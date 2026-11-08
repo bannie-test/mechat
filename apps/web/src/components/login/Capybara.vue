@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * A capybara chilling in a pool: sitting in a striped lifebuoy, sunglasses pushed up,
+ * A couldn't-care-less capybara chilling in a pool: slouched in a striped lifebuoy, huge black
+ * shades on, one eyebrow up, smirking, a "yang lake" tattoo on the arm draped over the ring,
  * sipping a cocktail now and then. The parent puts water in front of the ring's lower half.
- *   idle – sips the cocktail every few seconds (eyes close blissfully while sipping)
+ *   idle – sips the cocktail; now and then lowers the shades to give you a bored look
  *   shy  – eyes shut + blush, stops sipping (someone is entering a secret code)
  *   sad  – wrong code: eyes open, a little tear
  *   dive – hops out of the ring and dives head-first; the ring stays floating
@@ -36,11 +37,19 @@ defineProps<{ mood: 'idle' | 'shy' | 'sad' | 'dive' }>()
       <!-- ring front half, over his belly -->
       <use href="#capy-ring" class="ring" clip-path="url(#capy-front)" />
 
-      <!-- left arm draped over the ring -->
+      <!-- left arm lazily draped over the ring, "yang lake" tattooed on it -->
       <g class="mover">
-        <path d="M68 126Q52 132 50 147" stroke="#9b6640" stroke-width="13" stroke-linecap="round" fill="none" />
-        <ellipse cx="49" cy="150" rx="8.5" ry="6.5" fill="#8a5634" />
-        <path d="M45 153v2.5M49 154v2.5M53 153v2.5" stroke="#5b3820" stroke-width="1.3" stroke-linecap="round" />
+        <path d="M72 120Q46 121 35 143" stroke="#9b6640" stroke-width="17" stroke-linecap="round" fill="none" />
+        <path d="M70 116Q50 117 41 131" stroke="#b07a4c" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.5" />
+        <ellipse cx="34" cy="148" rx="10" ry="7.5" fill="#8a5634" />
+        <path d="M29 152v2.8M34 153v2.8M39 152v2.8" stroke="#5b3820" stroke-width="1.4" stroke-linecap="round" />
+        <defs><path id="capy-tattoo-line" d="M37 139Q47 123 71 121" /></defs>
+        <g class="tattoo">
+          <path d="M63 113.5c-1.6-2.4-5-.6-3.2 1.9l3.2 3.2 3.2-3.2c1.8-2.5-1.6-4.3-3.2-1.9z" fill="#c0392b" opacity="0.85" />
+          <text font-size="7.4" font-weight="800" font-family="'Brush Script MT', 'Segoe Script', cursive" fill="#1d2433" letter-spacing="0.2" opacity="0.88">
+            <textPath href="#capy-tattoo-line" startOffset="6%">yang lake</textPath>
+          </text>
+        </g>
       </g>
 
       <!-- head -->
@@ -55,29 +64,38 @@ defineProps<{ mood: 'idle' | 'shy' | 'sad' | 'dive' }>()
           <rect x="40" y="70" width="60" height="42" rx="20" fill="#8c5733" />
           <ellipse cx="58" cy="80" rx="4" ry="2.6" fill="#3d2414" />
           <ellipse cx="82" cy="80" rx="4" ry="2.6" fill="#3d2414" />
-          <path d="M62 96q8 6 16 0" stroke="#3d2414" stroke-width="2.4" fill="none" stroke-linecap="round" />
-          <ellipse class="blush" cx="32" cy="76" rx="8" ry="5" fill="#ff8fa3" />
-          <ellipse class="blush" cx="108" cy="76" rx="8" ry="5" fill="#ff8fa3" />
-          <g class="eyes-open">
-            <g class="blink">
-              <ellipse cx="46" cy="58" rx="4.6" ry="5.6" fill="#24150b" />
-              <ellipse cx="94" cy="58" rx="4.6" ry="5.6" fill="#24150b" />
-              <circle cx="47.6" cy="56" r="1.6" fill="#fff" />
-              <circle cx="95.6" cy="56" r="1.6" fill="#fff" />
-            </g>
-            <path class="tear" d="M98 66q-3 6 0 8q3-2 0-8z" fill="#7cc7ff" />
+          <!-- lopsided smirk -->
+          <path class="mouth" d="M58 98q10 4 22-3" stroke="#3d2414" stroke-width="2.4" fill="none" stroke-linecap="round" />
+          <path class="mouth" d="M80 95l2.6-1.6" stroke="#3d2414" stroke-width="2" stroke-linecap="round" />
+          <ellipse class="blush" cx="30" cy="80" rx="8" ry="5" fill="#ff8fa3" />
+          <ellipse class="blush" cx="110" cy="80" rx="8" ry="5" fill="#ff8fa3" />
+
+          <!-- bored half-lidded eyes, only seen when the shades come down -->
+          <g class="eyes">
+            <ellipse cx="46" cy="58" rx="4.6" ry="5.4" fill="#24150b" />
+            <ellipse cx="94" cy="58" rx="4.6" ry="5.4" fill="#24150b" />
+            <path d="M39 55.5h14M87 55.5h14" stroke="#ac7346" stroke-width="5" />
+            <path d="M40 57.5h12M88 57.5h12" stroke="#5b3820" stroke-width="1.6" stroke-linecap="round" />
           </g>
-          <g class="eyes-shut" stroke="#24150b" stroke-width="3" stroke-linecap="round" fill="none">
-            <path d="M40 58q6 6 12 0" />
-            <path d="M88 58q6 6 12 0" />
+          <path class="tear" d="M100 78q-3 6 0 8q3-2 0-8z" fill="#7cc7ff" />
+
+          <!-- one eyebrow up: "and?" -->
+          <g class="brows" stroke="#5b3820" stroke-width="3.2" stroke-linecap="round" fill="none">
+            <path d="M34 40q10-3 20 1" />
+            <path class="brow-up" d="M86 36q10-7 21-1" />
           </g>
-          <!-- sunglasses pushed up on his head -->
+
+          <!-- big black shades -->
           <g class="shades">
-            <path d="M50 36h-10M90 36h10" stroke="#2b2f3a" stroke-width="2" stroke-linecap="round" />
-            <rect x="50" y="31" width="18" height="11" rx="4.5" fill="#2b2f3a" />
-            <rect x="72" y="31" width="18" height="11" rx="4.5" fill="#2b2f3a" />
-            <path d="M68 35q2-2.5 4 0" stroke="#2b2f3a" stroke-width="2" fill="none" />
-            <path d="M53 34l5-1M75 34l5-1" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity="0.6" />
+            <path d="M22 52h-6M118 52h6" stroke="#111318" stroke-width="3" stroke-linecap="round" />
+            <path d="M20 46q0-4 4-4h38q5 0 5 5v6q0 15-21 15h-6q-20 0-20-14z" fill="#111318" />
+            <path d="M73 47q0-5 5-5h38q4 0 4 4v4q0 14-20 14h-6q-21 0-21-15z" fill="#111318" />
+            <path d="M66 47q4-4 8 0" stroke="#111318" stroke-width="4" fill="none" />
+            <path d="M24 44h38M78 44h38" stroke="#3a3f4b" stroke-width="1.4" stroke-linecap="round" />
+            <g class="glint">
+              <path d="M28 60l12-14M34 62l9-11" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity="0.55" />
+              <path d="M82 60l12-14" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity="0.4" />
+            </g>
           </g>
         </g>
       </g>
@@ -115,47 +133,48 @@ defineProps<{ mood: 'idle' | 'shy' | 'sad' | 'dive' }>()
 .capy { width: 150px; animation: bob 4.2s ease-in-out infinite; transform-origin: 50% 75%; }
 .art { display: block; width: 100%; overflow: visible; }
 @keyframes bob {
-  0%, 100% { transform: translateY(0) rotate(-2deg); }
-  50% { transform: translateY(4px) rotate(2deg); }
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  50% { transform: translateY(4px) rotate(-1deg); }
 }
 
 .mover, .arm, .ring { transform-box: view-box; }
 .mover { transform-origin: 100px 110px; }
 .arm { transform-origin: 138px 130px; transform: rotate(14deg); }
 
-.blink { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; }
-@keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
-.eyes-open, .eyes-shut { transition: opacity 0.15s; }
-.eyes-shut, .tear { opacity: 0; }
-.blush { opacity: 0.25; transition: opacity 0.3s; }
+.eyes, .shades, .brow-up, .glint { transform-box: fill-box; }
+.shades { transform-origin: 50% 0; transition: transform 0.3s var(--ease-out, ease); }
+.brow-up { transform-origin: 0 100%; }
+.tear { opacity: 0; }
+.blush { opacity: 0; transition: opacity 0.3s; }
 .fizz { opacity: 0; }
+.glint { animation: glint 6s ease-in-out infinite; }
+@keyframes glint { 0%, 80%, 100% { transform: translateX(0); opacity: 1; } 88% { transform: translateX(8px); opacity: 0.2; } }
 
-/* idle: a lazy sip every 7 s – the arm brings the straw to his mouth and his eyes close. */
+/* idle: a lazy sip every 7 s; every other beat he lowers the shades and gives you a bored look. */
 .idle .arm { animation: sip 7s ease-in-out infinite; }
-.idle .eyes-open { animation: sip-open 7s ease-in-out infinite; }
-.idle .eyes-shut { animation: sip-shut 7s ease-in-out infinite; }
 .idle .fizz { animation: fizz 7s ease-in-out infinite; }
 .idle .drink { transform-box: fill-box; transform-origin: 50% 100%; animation: drink 7s ease-in-out infinite; }
+.idle .shades { animation: peek 14s ease-in-out infinite; }
+.idle .brow-up { animation: brow 14s ease-in-out infinite; }
 @keyframes sip { 0%, 55% { transform: rotate(14deg); } 63%, 80% { transform: rotate(0deg); } 88%, 100% { transform: rotate(14deg); } }
-@keyframes sip-open { 0%, 60%, 84%, 100% { opacity: 1; } 63%, 80% { opacity: 0; } }
-@keyframes sip-shut { 0%, 60%, 84%, 100% { opacity: 0; } 63%, 80% { opacity: 1; } }
 @keyframes fizz { 0%, 62% { opacity: 0; transform: translateY(0); } 70% { opacity: 1; } 80% { opacity: 0; transform: translateY(-6px); } 100% { opacity: 0; } }
 @keyframes drink { 0%, 62% { transform: scaleY(1); } 80%, 100% { transform: scaleY(0.88); } }
+@keyframes peek { 0%, 20%, 38%, 100% { transform: translateY(0); } 24%, 34% { transform: translateY(13px); } }
+@keyframes brow { 0%, 20%, 38%, 100% { transform: translateY(0); } 24%, 34% { transform: translateY(-3px) rotate(-6deg); } }
 
-.shy .eyes-open { opacity: 0; }
-.shy .eyes-shut { opacity: 1; }
+/* shy: blush, look away, shades firmly on */
 .shy .blush { opacity: 0.9; }
 .shy .arm { transform: rotate(22deg); transition: transform 0.4s; }
+.shy .brow-up { transform: translateY(3px) rotate(8deg); }
 
+/* sad: shades slip down a bit, a tear rolls out from under them */
+.sad .shades { transform: translateY(5px) rotate(-3deg); }
 .sad .tear { opacity: 1; animation: tear 1.2s ease-in infinite; }
-.sad .blink { animation: none; transform: scaleY(0.75); }
 @keyframes tear { from { transform: translateY(-2px); opacity: 1; } to { transform: translateY(10px); opacity: 0; } }
 
 /* dive: hop out of the ring, flip, sink below the water in front. The ring stays. */
 .dive .mover { animation: dive 1s cubic-bezier(.45, 0, .55, 1) forwards; }
 .dive .arm { transform: rotate(0deg); }
-.dive .eyes-open { opacity: 0; }
-.dive .eyes-shut { opacity: 1; }
 .dive .ring { animation: ring-bob 1.2s ease-out; }
 @keyframes dive {
   0% { transform: translateY(0) rotate(0); }

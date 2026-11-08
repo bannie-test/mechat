@@ -10,6 +10,8 @@ import { formatDuration } from '@/lib/format'
 import { resizeImage, uploadAttachment } from '@/lib/storage'
 import { vibrate } from '@/lib/motion'
 import { sfx } from '@/lib/sound'
+import { isWeatherCommand, WEATHER_COMMANDS } from '@/lib/weather'
+import { useSettings } from '@/stores/settings'
 import type { Attachment, Message } from '@/lib/types'
 import { useRecorder } from '@/composables/useRecorder'
 import { useWide } from '@/composables/useBreakpoint'
@@ -41,6 +43,19 @@ const showEmoji = ref(false)
 const showAttach = ref(false)
 
 const canSend = computed(() => text.value.trim().length > 0)
+const settings = useSettings()
+
+// Slash commands: suggestions while typing "/…"
+const commandHints = computed(() => {
+  const v = text.value
+  if (!v.startsWith('/') || /\s/.test(v) || props.editing) return []
+  const q = v.toLowerCase().normalize('NFC')
+  return WEATHER_COMMANDS.filter((c) => c.startsWith(q) && c !== q)
+})
+function useCommand(c: string) {
+  text.value = c
+  void submit()
+}
 
 watch(text, (v) => {
   drafts.set(props.chatId, v)
@@ -81,6 +96,10 @@ function insertText(s: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if ((e.key === 'Tab' || (e.key === 'Enter' && !e.altKey && !e.shiftKey)) && commandHints.value.length && !e.isComposing) {
+    e.preventDefault()
+    return useCommand(commandHints.value[0])
+  }
   if (e.key === 'Enter' && !e.isComposing) {
     // Enter sends; Alt+Enter (or Shift+Enter) starts a new line.
     if (e.altKey) {
@@ -118,6 +137,13 @@ async function submit() {
   text.value = ''
   drafts.delete(props.chatId)
   realtime.stopTyping(props.chatId)
+  if (isWeatherCommand(body)) {
+    emit('sent')
+    sfx.pop()
+    void messages.postWeather(props.chatId, settings.locale)
+    input.value?.focus()
+    return
+  }
   const reply = props.replyTo?.id ?? null
   emit('sent')
   sfx.sent()
@@ -255,6 +281,14 @@ function snippet(m: Message) {
       </div>
     </Transition>
 
+    <Transition name="pop">
+      <div v-if="commandHints.length" class="popover cmd-pop">
+        <button v-for="c in commandHints" :key="c" @pointerdown.prevent @click="useCommand(c)">
+          <span class="cmd-ic">🌤️</span><b>{{ c }}</b><small class="muted">{{ $t('weather.hint') }}</small>
+        </button>
+      </div>
+    </Transition>
+
     <div class="box">
       <Transition name="bar">
         <div v-if="editing || replyTo" class="context">
@@ -344,6 +378,14 @@ function snippet(m: Message) {
 }
 .attach-pop button { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 8px; font-weight: 500; }
 .attach-pop button:hover { background: var(--hover); }
+.cmd-pop {
+  left: 8px; display: grid; padding: 6px; min-width: 260px; border-radius: 14px; background: var(--surface);
+  box-shadow: var(--shadow-lg); transform-origin: bottom left;
+}
+.cmd-pop button { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; text-align: left; }
+.cmd-pop button:hover { background: var(--hover); }
+.cmd-pop small { margin-left: auto; font-size: 12px; }
+.cmd-ic { font-size: 18px; }
 
 .bar-enter-active, .bar-leave-active { transition: max-height 0.2s var(--ease-out), opacity 0.2s; max-height: 60px; overflow: hidden; }
 .bar-enter-from, .bar-leave-to { max-height: 0; opacity: 0; }

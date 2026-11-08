@@ -3,7 +3,8 @@ import { reactive } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { copyAttachment, removeAttachment } from '@/lib/storage'
 import { sfx } from '@/lib/sound'
-import type { Attachment, Message, MessageKind, Reaction } from '@/lib/types'
+import { fetchWeather, type WeatherError } from '@/lib/weather'
+import type { Attachment, Locale, Message, MessageKind, Reaction } from '@/lib/types'
 import { useAuth } from './auth'
 import { useChats } from './chats'
 
@@ -101,7 +102,7 @@ export const useMessages = defineStore('messages', () => {
   async function loadOlder(chatId: string) {
     const b = bucket(chatId)
     if (b.loading || !b.hasMore) return 0
-    const oldest = b.items.find((m) => !m._status)
+    const oldest = b.items.find((m) => !m._status && !m._local)
     if (!oldest) return 0
     b.loading = true
     try {
@@ -164,6 +165,26 @@ export const useMessages = defineStore('messages', () => {
     upsert(msg)
     useChats().onMessageInsert(msg)
     await deliver(msg)
+  }
+
+  /** /weather: a system card only you see, filled in once the location and forecast arrive. */
+  async function postWeather(chatId: string, locale: Locale) {
+    const msg: Message = {
+      id: crypto.randomUUID(), chat_id: chatId, sender_id: null, kind: 'weather', content: null,
+      attachment: { state: 'loading' }, reply_to_id: null, forwarded_from: null,
+      created_at: new Date().toISOString(), edited_at: null, deleted_at: null, _local: true,
+    }
+    upsert(msg)
+    const cur = () => bucket(chatId).items.find((m) => m.id === msg.id)
+    try {
+      const report = await fetchWeather(locale)
+      const m = cur()
+      if (m) m.attachment = { state: 'ok', report }
+    } catch (e) {
+      const m = cur()
+      const error: WeatherError = e === 'denied' || e === 'unavailable' ? e : 'network'
+      if (m) m.attachment = { state: 'error', error }
+    }
   }
 
   async function retry(msg: Message) {
@@ -261,7 +282,7 @@ export const useMessages = defineStore('messages', () => {
 
   return {
     byChat, reactions, extras, bucket, find, fetchOne,
-    loadLatest, loadOlder, send, retry, discard, edit, remove, toggleReaction, forward,
+    loadLatest, loadOlder, send, postWeather, retry, discard, edit, remove, toggleReaction, forward,
     onRemote, onReaction, reset,
   }
 })
