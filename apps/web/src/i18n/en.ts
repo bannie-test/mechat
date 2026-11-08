@@ -27,6 +27,7 @@ export default {
     resendIn: 'Resend in {s}s',
     game: {
       hint: 'Tap the balloons to shoot the code from your email 🎯',
+      checking: 'Checking your code…',
       back: 'Delete last digit',
       typeInstead: 'Type the code instead',
       playInstead: 'Shoot balloons instead 🎈',

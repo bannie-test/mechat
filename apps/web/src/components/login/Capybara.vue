@@ -97,8 +97,10 @@ defineProps<{ mood: 'idle' | 'shy' | 'sad' | 'dive' }>()
             </g>
             <line x1="152" y1="90" x2="152" y2="103" stroke="rgba(255,255,255,0.95)" stroke-width="2.4" />
             <ellipse cx="152" cy="104" rx="7" ry="2" fill="rgba(255,255,255,0.95)" />
-            <path d="M149 82L108 99" stroke="#29b6f6" stroke-width="3.2" stroke-linecap="round" />
-            <path d="M149 82L108 99" stroke="#fff" stroke-width="3.2" stroke-dasharray="3 4" opacity="0.8" />
+            <path d="M149 84V70C149 59 133 58 124 72C117 84 110 96 103 103" stroke="#29b6f6" stroke-width="3.2" stroke-linecap="round" fill="none" />
+            <path d="M149 84V70C149 59 133 58 124 72C117 84 110 96 103 103" stroke="#fff" stroke-width="3.2" stroke-dasharray="3 4" opacity="0.8" fill="none" />
+            <!-- accordion bend -->
+            <path d="M146.6 66.5h5M146 63.8h5.6M144.6 61.4h5.4" stroke="#0288d1" stroke-width="1" opacity="0.6" />
             <circle cx="135.5" cy="70" r="6" fill="#9be15d" stroke="#6cbf3a" stroke-width="1.5" />
             <path d="M135.5 64v12M130 70h11" stroke="#d9f7bf" stroke-width="1" />
           </g>
