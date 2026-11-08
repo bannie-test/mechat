@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { QUICK_REACTIONS } from '@/lib/emoji'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { messageActions, type MessageAction } from '@/lib/messageActions'
 import type { Message } from '@/lib/types'
+import { useSettings } from '@/stores/settings'
+import EmojiGrid from './EmojiGrid.vue'
 import Icon from './Icon.vue'
 
-const props = defineProps<{ msg: Message; x: number; y: number; mine: boolean; container: DOMRect }>()
-const emit = defineEmits<{ close: []; action: [name: 'reply' | 'copy' | 'edit' | 'forward' | 'delete']; react: [emoji: string] }>()
+const props = defineProps<{ msg: Message; x: number; y: number; mine: boolean; container: DOMRect; emojiGrid?: boolean }>()
+const emit = defineEmits<{ close: []; action: [name: MessageAction]; react: [emoji: string] }>()
 
+const settings = useSettings()
 const el = ref<HTMLElement | null>(null)
 const pos = ref({ left: 0, top: 0, origin: 'top left' })
+const actions = computed(() => messageActions(props.msg, props.mine))
+const more = ref(!!props.emojiGrid)
 
-const canEdit = computed(() => props.mine && props.msg.kind === 'text' && !props.msg._status)
-const canCopy = computed(() => !!props.msg.content && props.msg.kind !== 'sticker')
-
-onMounted(() => {
+function place() {
   const w = el.value?.offsetWidth ?? 220
   const h = el.value?.offsetHeight ?? 260
   const c = props.container
@@ -24,7 +26,14 @@ onMounted(() => {
   if (left + w > c.width - 8) { left = Math.max(8, left - w); ox = 'right' }
   if (top + h > c.height - 8) { top = Math.max(8, top - h); oy = 'bottom' }
   pos.value = { left, top, origin: `${oy} ${ox}` }
-})
+}
+onMounted(place)
+
+async function showMore() {
+  more.value = true
+  await nextTick()
+  place()
+}
 </script>
 
 <template>
@@ -35,15 +44,20 @@ onMounted(() => {
     ref="el" class="menu" :style="{ left: pos.left + 'px', top: pos.top + 'px', transformOrigin: pos.origin }"
     @contextmenu.prevent
   >
-    <div v-if="!msg._status" class="reactions">
-      <button v-for="(e, i) in QUICK_REACTIONS" :key="e" class="react" :style="{ animationDelay: i * 25 + 'ms' }" @click="emit('react', e)">{{ e }}</button>
-    </div>
-    <div class="actions">
-      <button v-if="!msg._status" v-ripple @click="emit('action', 'reply')"><Icon name="reply" :size="20" />{{ $t('menu.reply') }}</button>
-      <button v-if="canCopy" v-ripple @click="emit('action', 'copy')"><Icon name="copy" :size="20" />{{ $t('menu.copy') }}</button>
-      <button v-if="canEdit" v-ripple @click="emit('action', 'edit')"><Icon name="edit" :size="20" />{{ $t('menu.edit') }}</button>
-      <button v-if="!msg._status && msg.kind !== 'call'" v-ripple @click="emit('action', 'forward')"><Icon name="forward" :size="20" />{{ $t('menu.forward') }}</button>
-      <button v-if="mine" v-ripple class="danger" @click="emit('action', 'delete')"><Icon name="trash" :size="20" />{{ $t('menu.delete') }}</button>
+    <template v-if="!msg._status">
+      <EmojiGrid v-if="more" @pick="emit('react', $event)" />
+      <div v-else class="reactions">
+        <button
+          v-for="(e, i) in settings.quickReactions" :key="e" class="react" :style="{ animationDelay: i * 25 + 'ms' }"
+          @click="emit('react', e)"
+        >{{ e }}</button>
+        <button class="react plus" :style="{ animationDelay: '125ms' }" :title="$t('menu.moreReactions')" @click="showMore"><Icon name="plus" :size="22" /></button>
+      </div>
+    </template>
+    <div v-if="!more" class="actions">
+      <button v-for="a in actions" :key="a.name" v-ripple :class="{ danger: a.danger }" @click="emit('action', a.name)">
+        <Icon :name="a.icon" :size="20" />{{ $t(`menu.${a.name}`) }}
+      </button>
     </div>
   </div>
 </template>
@@ -62,6 +76,8 @@ onMounted(() => {
 }
 .react { font-size: 26px; width: 40px; height: 40px; border-radius: 50%; transition: transform 0.15s var(--ease-out); animation: react-in 0.3s var(--ease-out) backwards; }
 .react:hover { transform: scale(1.25); }
+.react.plus { display: grid; place-items: center; color: var(--text-muted); background: var(--surface-2); }
+.react.plus:hover { transform: scale(1.1); color: var(--accent); }
 @keyframes react-in { from { transform: scale(0); } }
 .actions { display: grid; min-width: 200px; padding: 6px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-lg); justify-self: start; }
 .actions button { display: flex; align-items: center; gap: 14px; padding: 9px 12px; border-radius: 8px; text-align: left; font-weight: 500; }

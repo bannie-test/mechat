@@ -8,7 +8,9 @@ import { useAuth } from '@/stores/auth'
 import { useSettings, type ThemePref } from '@/stores/settings'
 import { useUi } from '@/stores/ui'
 import type { Locale } from '@/lib/types'
+import { ACCENTS } from '@/lib/emoji'
 import Avatar from './Avatar.vue'
+import EmojiGrid from './EmojiGrid.vue'
 import Icon from './Icon.vue'
 import ScreenHeader from './ScreenHeader.vue'
 
@@ -75,6 +77,30 @@ function setTheme(p: ThemePref, e: MouseEvent) {
   settings.setTheme(p, { x: e.clientX, y: e.clientY })
 }
 
+// ---- quick reactions / accent / background ------------------------------------
+const editingSlot = ref<number | null>(null)
+function pickReaction(e: string) {
+  if (editingSlot.value === null) return
+  settings.setQuickReaction(editingSlot.value, e)
+  editingSlot.value = null
+}
+
+const wallpaperBusy = ref(false)
+async function pickWallpaper(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  input.value = ''
+  if (!f) return
+  wallpaperBusy.value = true
+  try {
+    if (!(await settings.setWallpaper(f))) ui.toast(t('settings.wallpaperTooBig'))
+  } catch {
+    ui.toast(t('errors.generic'))
+  } finally {
+    wallpaperBusy.value = false
+  }
+}
+
 async function togglePush() {
   pushBusy.value = true
   try {
@@ -119,6 +145,46 @@ async function signOut() {
         </button>
       </div>
 
+      <div class="section-title">{{ $t('settings.accent') }}</div>
+      <div class="swatches">
+        <button
+          v-for="c in ACCENTS" :key="c" class="swatch" :style="{ background: c }"
+          :class="{ on: (settings.accent ?? ACCENTS[0]) === c }" :title="c"
+          @click="settings.setAccent(c === ACCENTS[0] ? null : c)"
+        ><Icon v-if="(settings.accent ?? ACCENTS[0]) === c" name="check" :size="18" /></button>
+        <label class="swatch custom" :title="$t('settings.customColor')" :class="{ on: !!settings.accent && !ACCENTS.includes(settings.accent) }">
+          <Icon name="plus" :size="18" />
+          <input type="color" :value="settings.accent ?? ACCENTS[0]" @input="settings.setAccent(($event.target as HTMLInputElement).value)" />
+        </label>
+      </div>
+
+      <div class="section-title">{{ $t('settings.wallpaper') }}</div>
+      <div class="wall-row">
+        <div class="wall-preview" :style="settings.wallpaper ? { backgroundImage: `url(&quot;${settings.wallpaper}&quot;)` } : undefined">
+          <span class="wp-bubble in" /><span class="wp-bubble out" />
+        </div>
+        <div class="wall-actions">
+          <label v-ripple class="btn-soft">
+            <span v-if="wallpaperBusy" class="spinner sm" /><Icon v-else name="image" :size="18" />{{ $t('settings.wallpaperUpload') }}
+            <input type="file" accept="image/*" hidden @change="pickWallpaper" />
+          </label>
+          <button v-if="settings.wallpaper" v-ripple class="btn-soft" @click="settings.setWallpaper(null)">{{ $t('settings.wallpaperReset') }}</button>
+        </div>
+      </div>
+
+      <div class="section-title">{{ $t('settings.reactions') }}</div>
+      <div class="reactions-edit">
+        <button
+          v-for="(e, i) in settings.quickReactions" :key="i" class="slot" :class="{ on: editingSlot === i }"
+          @click="editingSlot = editingSlot === i ? null : i"
+        >{{ e }}</button>
+        <button class="reset-link" @click="settings.resetQuickReactions(); editingSlot = null">{{ $t('settings.reset') }}</button>
+      </div>
+      <small class="muted hint">{{ $t('settings.reactionsHint') }}</small>
+      <div v-if="editingSlot !== null" class="grid-wrap">
+        <EmojiGrid :selected="settings.quickReactions[editingSlot]" @pick="pickReaction" />
+      </div>
+
       <div class="section-title">{{ $t('settings.language') }}</div>
       <div class="seg">
         <button :class="{ on: settings.locale === 'en' }" @click="setLocale('en')">English</button>
@@ -134,6 +200,19 @@ async function signOut() {
         </span>
         <span class="switch">
           <input type="checkbox" :checked="push === 'enabled'" :disabled="pushBusy || push === 'unsupported' || push === 'denied' || push === 'needs-install'" @change="togglePush" />
+          <i />
+        </span>
+      </label>
+
+      <div class="section-title">{{ $t('settings.sounds') }}</div>
+      <label class="list-item">
+        <Icon name="bell" class="muted" />
+        <span class="grow">
+          {{ $t('settings.soundTitle') }}
+          <small class="muted block">{{ $t('settings.soundHint') }}</small>
+        </span>
+        <span class="switch">
+          <input v-model="settings.sound" type="checkbox" />
           <i />
         </span>
       </label>
@@ -164,5 +243,37 @@ async function signOut() {
 .block { display: block; font-size: 12px; }
 .disabled { opacity: 0.6; }
 .danger { color: var(--danger); margin-top: 16px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 8px; }
+.swatch {
+  position: relative; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08); transition: transform 0.15s var(--ease-out); cursor: pointer;
+}
+.swatch:hover { transform: scale(1.08); }
+.swatch.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.swatch.custom { background: conic-gradient(#f44, #fd4, #4d6, #4cf, #64f, #f4c, #f44); }
+.swatch.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.wall-row { display: flex; gap: 14px; align-items: center; padding: 0 8px; }
+.wall-preview {
+  position: relative; flex: none; width: 96px; height: 120px; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(160deg, var(--chat-bg), var(--chat-bg-2)) center / cover; box-shadow: var(--shadow);
+}
+.wp-bubble { position: absolute; height: 14px; border-radius: 7px; box-shadow: var(--shadow); }
+.wp-bubble.in { left: 8px; top: 40px; width: 52px; background: var(--bubble-in); }
+.wp-bubble.out { right: 8px; top: 66px; width: 60px; background: var(--bubble-out); }
+.wall-actions { display: grid; gap: 8px; }
+.btn-soft {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 10px;
+  background: var(--surface-2); font-weight: 500; cursor: pointer;
+}
+.spinner.sm { width: 16px; height: 16px; border-width: 2px; }
+.reactions-edit { display: flex; align-items: center; gap: 8px; padding: 0 8px; }
+.slot { width: 46px; height: 46px; border-radius: 12px; font-size: 26px; background: var(--surface-2); transition: transform 0.15s var(--ease-out); }
+.slot:hover { transform: scale(1.06); }
+.slot.on { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+.reset-link { margin-left: auto; color: var(--accent); font-weight: 500; padding: 6px 8px; }
+.hint { display: block; padding: 6px 8px 0; font-size: 12px; }
+.grid-wrap { padding: 8px 8px 0; }
+.grid-wrap :deep(.egrid) { width: 100%; max-width: none; box-shadow: none; background: var(--surface-2); }
+.grid-wrap :deep(.g) { background: var(--surface-2); }
 .version { text-align: center; font-size: 12px; margin-top: 20px; }
 </style>
