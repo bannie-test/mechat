@@ -128,6 +128,8 @@ const atBottom = ref(true)
 const ready = ref(false)
 const animateIds = ref(new Set<string>())
 const highlightId = ref<string | null>(null)
+/** Message whose time is revealed by a tap (only the last of each run shows it otherwise). */
+const selectedId = ref<string | null>(null)
 
 function scrollToBottom(smooth = false) {
   const el = scroller.value
@@ -340,6 +342,8 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
             :reply-to="replyTarget(row.msg)"
             :lifted="menu?.msg.id === row.msg.id"
             :highlight="highlightId === row.msg.id"
+            :selected="selectedId === row.msg.id"
+            @select="selectedId = selectedId === row.msg.id ? null : row.msg.id"
             :animate="animateIds.has(row.msg.id)"
             @menu="(x, y, grid) => openMenu(row.msg, x, y, grid)"
             @action="(a) => onMenuAction(a, row.msg)"

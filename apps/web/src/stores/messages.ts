@@ -263,7 +263,7 @@ export const useMessages = defineStore('messages', () => {
     const chats = useChats()
     const originalSender = msg.forwarded_from ?? {
       sender_id: msg.sender_id,
-      sender_name: chats.people[msg.sender_id ?? '']?.display_name ?? '',
+      sender_name: chats.realName(msg.sender_id),
     }
     let attachment = msg.attachment
     if (attachment?.path) attachment = { ...attachment, path: await copyAttachment(attachment.path, toChatId) }
