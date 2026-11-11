@@ -5,6 +5,7 @@ import { formatBytes, formatTime, isOnlyEmoji, linkify } from '@/lib/format'
 import { signedUrl } from '@/lib/storage'
 import { vibrate } from '@/lib/motion'
 import { onLongPress } from '@/composables/useLongPress'
+import { useWide } from '@/composables/useBreakpoint'
 import { messageActions, type MessageAction } from '@/lib/messageActions'
 import type { ChatType, Message, Reaction } from '@/lib/types'
 import { useAuth } from '@/stores/auth'
@@ -28,6 +29,8 @@ const props = defineProps<{
   replyTo?: Message | null
   lifted?: boolean
   highlight?: boolean
+  /** Clicked: show this message's time even if it isn't the last of its run. */
+  selected?: boolean
   animate?: boolean
 }>()
 const emit = defineEmits<{
@@ -38,6 +41,7 @@ const emit = defineEmits<{
   jump: [id: string]
   open: [src: string]
   action: [name: MessageAction]
+  select: []
 }>()
 
 const { t } = useI18n()
@@ -53,14 +57,35 @@ const bigEmoji = computed(() => props.msg.kind === 'text' && isOnlyEmoji(props.m
 const bare = computed(() => props.msg.kind === 'sticker' || bigEmoji.value)
 const segments = computed(() => linkify(props.msg.content ?? ''))
 const actions = computed(() => messageActions(props.msg, mine.value))
-/** overlay: on top of media; block: own line under voice/file/call; default: bottom-right corner of the text. */
-const metaClass = computed(() => {
-  const k = props.msg.kind
-  if ((k === 'image' && !props.msg.content) || k === 'gif' || bare.value) return 'overlay'
-  if (k === 'voice' || k === 'file' || k === 'call') return 'block'
-  return 'corner'
-})
-const hoverable = computed(() => !props.msg._status && props.msg.kind !== 'system')
+/** Time / ticks: on the last message of a run, on the selected one, and while sending or failed. */
+const showTime = computed(() => props.last || props.selected || !!props.msg._status)
+
+/**
+ * Computer (wide screen + mouse): double-click shows the time; actions live in the hover toolbar,
+ * so right-click is left to the browser. Phone / tablet: tap shows the time, long-press opens the menu.
+ */
+const wide = useWide()
+const finePointer = matchMedia('(hover: hover) and (pointer: fine)')
+const desktop = () => wide.value && finePointer.matches
+
+function onBubbleDblClick(e: MouseEvent) {
+  if (!desktop()) return
+  if ((e.target as HTMLElement).closest('a, button, input, audio, video, .quote')) return
+  window.getSelection()?.removeAllRanges()
+  emit('select')
+}
+/** Stop the second click of a double-click from selecting a word (desktop only). */
+function onBubbleMouseDown(e: MouseEvent) {
+  if (e.detail > 1 && desktop()) e.preventDefault()
+}
+
+function onBubbleClick(e: MouseEvent) {
+  if (desktop()) return
+  const t = e.target as HTMLElement
+  if (t.closest('a, button, input, audio, video, .quote')) return
+  if (window.getSelection()?.toString()) return // selecting text, not tapping
+  emit('select')
+}const hoverable = computed(() => !props.msg._status && props.msg.kind !== 'system')
 
 const grouped = computed(() => {
   const map = new Map<string, { emoji: string; count: number; mine: boolean; users: string[] }>()
@@ -130,7 +155,7 @@ onMounted(() => {
     if (dx.value !== 0) return
     vibrate(15)
     emit('menu', x, y)
-  })
+  }, 420, () => !desktop())
 })
 onBeforeUnmount(() => unbind?.())
 </script>
@@ -145,7 +170,7 @@ onBeforeUnmount(() => unbind?.())
     </div>
 
     <div class="swipe" :style="dx ? { transform: `translateX(${dx}px)`, transition: 'none' } : undefined">
-      <div ref="root" class="bubble" :class="[msg.kind, { bare }]">
+      <div ref="root" class="bubble" :class="[msg.kind, { bare }]" @click="onBubbleClick" @dblclick="onBubbleDblClick" @mousedown="onBubbleMouseDown">
         <div v-if="showName" class="name" :style="{ color: 'var(--accent)' }">{{ sender?.display_name }}</div>
 
         <div v-if="msg.forwarded_from" class="forwarded">
@@ -160,7 +185,7 @@ onBeforeUnmount(() => unbind?.())
         <!-- content -->
         <template v-if="msg.kind === 'image'">
           <MediaImage :attachment="msg.attachment" :local-url="msg._localUrl" :uploading="msg._status === 'sending'" :progress="msg._progress" @open="emit('open', $event)" />
-          <p v-if="msg.content" class="text caption">{{ msg.content }}<span class="meta-space" aria-hidden="true"><span v-if="msg.edited_at">{{ $t('chat.edited') }} </span>{{ formatTime(msg.created_at, settings.locale) }}<i v-if="mine" /><span v-if="mine && msg._status === 'failed'">{{ $t('chat.notSent') }}</span></span></p>
+          <p v-if="msg.content" class="text caption">{{ msg.content }}</p>
         </template>
         <MediaImage v-else-if="msg.kind === 'gif'" :attachment="msg.attachment" :max-width="260" @open="emit('open', $event)" />
         <div v-else-if="msg.kind === 'sticker'" class="sticker">{{ msg.content }}</div>
@@ -177,9 +202,10 @@ onBeforeUnmount(() => unbind?.())
           </span>
         </button>
         <CallLog v-else-if="msg.kind === 'call'" :msg="msg" :mine="mine" :chat-type="chatType" />
-        <p v-else class="text" :class="{ big: bigEmoji }"><template v-for="(s, i) in segments" :key="i"><a v-if="s.href" :href="s.href" target="_blank" rel="noopener noreferrer" @click.stop>{{ s.text }}</a><template v-else>{{ s.text }}</template></template><template v-if="!bigEmoji"><span class="meta-space" aria-hidden="true"><span v-if="msg.edited_at">{{ $t('chat.edited') }} </span>{{ formatTime(msg.created_at, settings.locale) }}<i v-if="mine" /><span v-if="mine && msg._status === 'failed'">{{ $t('chat.notSent') }}</span></span></template></p>
+        <p v-else class="text" :class="{ big: bigEmoji }"><template v-for="(s, i) in segments" :key="i"><a v-if="s.href" :href="s.href" target="_blank" rel="noopener noreferrer" @click.stop>{{ s.text }}</a><template v-else>{{ s.text }}</template></template></p>
 
-        <span class="meta" :class="metaClass">
+        <Transition name="meta">
+        <span v-if="showTime" class="meta" :class="{ caption: msg.kind === 'image' && msg.content, media: (msg.kind === 'image' && !msg.content) || msg.kind === 'gif' }">
           <span v-if="msg.edited_at" class="edited">{{ $t('chat.edited') }}</span>
           {{ formatTime(msg.created_at, settings.locale) }}
           <template v-if="mine">
@@ -188,6 +214,7 @@ onBeforeUnmount(() => unbind?.())
             <Icon v-else :name="read ? 'checks' : 'check'" :size="16" />
           </template>
         </span>
+        </Transition>
       </div>
 
       <TransitionGroup v-if="grouped.length" tag="div" name="pop" class="reactions">
@@ -265,29 +292,23 @@ onBeforeUnmount(() => unbind?.())
 .text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; display: block; }
 .text.big { font-size: 42px; line-height: 1.15; }
 .caption { padding: 4px 7px 0; }
-/* Invisible copy of the time/ticks at the end of the last line: reserves room so the real meta can
-   sit in the bottom-right corner; if the last line is full, it wraps and the bubble gains a line. */
-.meta-space {
-  display: inline-flex; gap: 3px; margin-left: 10px; font-size: 11.5px; line-height: 1; visibility: hidden;
-  white-space: nowrap; vertical-align: baseline; pointer-events: none; user-select: none;
-}
-.meta-space i { width: 16px; }
 .sticker { font-size: 96px; line-height: 1.1; padding: 4px; }
 
 .meta {
-  display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; line-height: 1; color: var(--bubble-meta);
-  white-space: nowrap; user-select: none;
+  display: flex; align-items: center; gap: 3px; margin-top: 3px; font-size: 10.5px; line-height: 1.2;
+  color: var(--bubble-meta); white-space: nowrap; user-select: none;
 }
-.mine .meta { color: var(--bubble-out-meta); }
-.meta.corner { position: absolute; right: 10px; bottom: 6px; }
-.image .meta.corner { right: 10px; bottom: 7px; }
-.meta.block { display: flex; justify-content: flex-end; margin-top: 3px; }
-.meta.overlay {
-  position: absolute; right: 8px; bottom: 8px; padding: 3px 6px; border-radius: 10px; background: rgba(0, 0, 0, 0.42); color: #fff;
-}
-.bare .meta.overlay { right: 2px; bottom: 2px; }
+.mine .meta { justify-content: flex-end; color: var(--bubble-out-meta); }
+/* same side padding as the text they belong to */
+.meta.caption { padding: 0 7px 1px; }
+.meta.media { padding: 2px 7px 2px; }
+/* stickers / big emoji have no bubble: the time sits under them, never on top */
+.bare .meta { width: fit-content; margin-top: 2px; padding: 2px 7px; border-radius: 9px; background: rgba(0, 0, 0, 0.28); color: #fff; }
+.mine .bare .meta { margin-left: auto; color: #fff; }
+.meta-enter-active, .meta-leave-active { transition: opacity 0.18s, max-height 0.2s var(--ease-out), margin 0.2s; max-height: 20px; overflow: hidden; }
+.meta-enter-from, .meta-leave-to { opacity: 0; max-height: 0; margin-top: 0; }
 .edited { font-style: italic; }
-.failed { color: var(--danger); display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; }
+.failed { color: var(--danger); display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; }
 .sending { display: inline-grid; place-items: center; width: 14px; height: 14px; }
 .sending i {
   width: 11px; height: 11px; border-radius: 50%; border: 1.6px solid currentColor; border-right-color: transparent;
@@ -307,6 +328,8 @@ onBeforeUnmount(() => unbind?.())
   .hover-bar { display: flex; }
   .row:hover .hover-bar, .hover-bar:focus-within { opacity: 1; }
   .row:hover { z-index: 4; }
+  /* the message whose menu is open stays above the overlay even while hovered (no flicker) */
+  .row.lifted, .row.lifted:hover { z-index: 31; }
 }
 .mine .hover-bar { left: auto; right: 100%; }
 .row.lifted .hover-bar { opacity: 0 !important; pointer-events: none; }

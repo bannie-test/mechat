@@ -44,6 +44,8 @@ const showEmoji = ref(false)
 const showAttach = ref(false)
 
 const canSend = computed(() => text.value.trim().length > 0)
+/** Muted by the group owner, or the group only lets picked members send. */
+const allowed = computed(() => chats.canPost(props.chatId))
 const settings = useSettings()
 
 // Slash commands: suggestions while typing "/…"
@@ -296,88 +298,98 @@ function snippet(m: Message) {
 
 <template>
   <div class="composer" data-no-swipe>
-    <Transition name="pop">
-      <div v-if="showEmoji" class="popover emoji-pop">
-        <EmojiPanel @emoji="insertEmoji" @sticker="sendSticker" @gif="sendGif" />
-      </div>
-    </Transition>
-    <Transition name="pop">
-      <div v-if="showAttach" class="popover attach-pop">
-        <button v-ripple @click="photoInput?.click()"><span class="att-ic sky"><Icon name="imageOutline" :size="22" /></span>{{ $t('attach.photo') }}</button>
-        <button v-ripple @click="fileInput?.click()"><span class="att-ic emerald"><Icon name="fileOutline" :size="22" /></span>{{ $t('attach.file') }}</button>
-        <button v-ripple @click="openApps">
-          <span class="att-ic apps">
-            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="4" y="4" width="4" height="4" rx="1.2" fill="#f43f5e" /><rect x="10" y="4" width="4" height="4" rx="1.2" fill="#f59e0b" /><rect x="16" y="4" width="4" height="4" rx="1.2" fill="#eab308" />
-              <rect x="4" y="10" width="4" height="4" rx="1.2" fill="#22c55e" /><rect x="10" y="10" width="4" height="4" rx="1.2" fill="#14b8a6" /><rect x="16" y="10" width="4" height="4" rx="1.2" fill="#0ea5e9" />
-              <rect x="4" y="16" width="4" height="4" rx="1.2" fill="#6366f1" /><rect x="10" y="16" width="4" height="4" rx="1.2" fill="#a855f7" /><rect x="16" y="16" width="4" height="4" rx="1.2" fill="#ec4899" />
-            </svg>
-          </span>{{ $t('apps.title') }}
-        </button>
-      </div>
-    </Transition>
-
-    <Transition name="pop">
-      <div v-if="commandHints.length" class="popover cmd-pop">
-        <button v-for="c in commandHints" :key="c" @pointerdown.prevent @click="useCommand(c)">
-          <span class="cmd-ic">🌤️</span><b>{{ c }}</b><small class="muted">{{ $t('weather.hint') }}</small>
-        </button>
-      </div>
-    </Transition>
-
-    <div class="box">
-      <Transition name="bar">
-        <div v-if="editing || replyTo" class="context">
-          <Icon :name="editing ? 'edit' : 'reply'" :size="22" class="ctx-icon" />
-          <div class="ctx-body">
-            <b>{{ editing ? $t('chat.editing') : replyName }}</b>
-            <span class="ellipsis">{{ snippet((editing ?? replyTo)!) }}</span>
-          </div>
-          <button class="icon-btn" @click="emit('cancel')"><Icon name="close" :size="20" /></button>
+    <div v-if="!allowed" class="blocked">
+      <Icon name="lock" :size="18" />
+      <span>{{ chats.byId(chatId)?.restricted ? $t('group.restrictedNotice') : $t('group.mutedNotice') }}</span>
+    </div>
+    <template v-else>
+      <Transition name="pop">
+        <div v-if="showEmoji" class="popover emoji-pop">
+          <EmojiPanel @emoji="insertEmoji" @sticker="sendSticker" @gif="sendGif" />
+        </div>
+      </Transition>
+      <Transition name="pop">
+        <div v-if="showAttach" class="popover attach-pop">
+          <button v-ripple @click="photoInput?.click()"><span class="att-ic sky"><Icon name="imageOutline" :size="22" /></span>{{ $t('attach.photo') }}</button>
+          <button v-ripple @click="fileInput?.click()"><span class="att-ic emerald"><Icon name="fileOutline" :size="22" /></span>{{ $t('attach.file') }}</button>
+          <button v-ripple @click="openApps">
+            <span class="att-ic apps">
+              <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="4" width="4" height="4" rx="1.2" fill="#f43f5e" /><rect x="10" y="4" width="4" height="4" rx="1.2" fill="#f59e0b" /><rect x="16" y="4" width="4" height="4" rx="1.2" fill="#eab308" />
+                <rect x="4" y="10" width="4" height="4" rx="1.2" fill="#22c55e" /><rect x="10" y="10" width="4" height="4" rx="1.2" fill="#14b8a6" /><rect x="16" y="10" width="4" height="4" rx="1.2" fill="#0ea5e9" />
+                <rect x="4" y="16" width="4" height="4" rx="1.2" fill="#6366f1" /><rect x="10" y="16" width="4" height="4" rx="1.2" fill="#a855f7" /><rect x="16" y="16" width="4" height="4" rx="1.2" fill="#ec4899" />
+              </svg>
+            </span>{{ $t('apps.title') }}
+          </button>
         </div>
       </Transition>
 
-      <div v-if="rec.recording.value" class="recording">
-        <span class="rec-dot" :style="{ transform: `scale(${1 + rec.level.value * 1.5})` }" />
-        <span class="rec-time">{{ formatDuration(rec.elapsed.value) }}</span>
-        <span class="muted rec-hint">{{ $t('chat.recording') }}</span>
-        <button class="btn ghost" @click="rec.cancel()">{{ $t('common.cancel') }}</button>
-      </div>
-      <div v-else class="input-row">
-        <button class="icon-btn" :class="{ accent: showEmoji }" @click="showEmoji = !showEmoji; showAttach = false">
-          <Icon name="smile" />
-        </button>
-        <textarea
-          ref="input" v-model="text" rows="1" class="input" :placeholder="$t('chat.placeholder')"
-          enterkeyhint="send" @keydown="onKeydown" @paste="onPaste"
-        />
-        <button v-if="!editing" class="icon-btn" :class="{ accent: showAttach }" @click="showAttach = !showAttach; showEmoji = false">
-          <Icon name="attach" />
-        </button>
-      </div>
-    </div>
-
-    <button
-      v-ripple class="send"
-      :class="{ recording: rec.recording.value }"
-      :title="canSend ? $t('chat.send') : $t('chat.recordVoice')"
-      @click="rec.recording.value ? finishRecording() : canSend || editing ? submit() : startRecording()"
-    >
-      <Transition name="swap" mode="out-in">
-        <Icon v-if="editing" key="check" name="check" />
-        <Icon v-else-if="canSend || rec.recording.value" key="send" name="send" />
-        <Icon v-else key="mic" name="mic" />
+      <Transition name="pop">
+        <div v-if="commandHints.length" class="popover cmd-pop">
+          <button v-for="c in commandHints" :key="c" @pointerdown.prevent @click="useCommand(c)">
+            <span class="cmd-ic">🌤️</span><b>{{ c }}</b><small class="muted">{{ $t('weather.hint') }}</small>
+          </button>
+        </div>
       </Transition>
-    </button>
 
-    <ImageCropper v-if="cropping" :file="cropping" mode="send" @done="onCropped" @cancel="cropping = null" />
+      <div class="box">
+        <Transition name="bar">
+          <div v-if="editing || replyTo" class="context">
+            <Icon :name="editing ? 'edit' : 'reply'" :size="22" class="ctx-icon" />
+            <div class="ctx-body">
+              <b>{{ editing ? $t('chat.editing') : replyName }}</b>
+              <span class="ellipsis">{{ snippet((editing ?? replyTo)!) }}</span>
+            </div>
+            <button class="icon-btn" @click="emit('cancel')"><Icon name="close" :size="20" /></button>
+          </div>
+        </Transition>
 
-    <input ref="photoInput" type="file" accept="image/*" multiple hidden @change="onPick($event, 'photo')" />
-    <input ref="fileInput" type="file" multiple hidden @change="onPick($event, 'file')" />
+        <div v-if="rec.recording.value" class="recording">
+          <span class="rec-dot" :style="{ transform: `scale(${1 + rec.level.value * 1.5})` }" />
+          <span class="rec-time">{{ formatDuration(rec.elapsed.value) }}</span>
+          <span class="muted rec-hint">{{ $t('chat.recording') }}</span>
+          <button class="btn ghost" @click="rec.cancel()">{{ $t('common.cancel') }}</button>
+        </div>
+        <div v-else class="input-row">
+          <button class="icon-btn" :class="{ accent: showEmoji }" @click="showEmoji = !showEmoji; showAttach = false">
+            <Icon name="smile" />
+          </button>
+          <textarea
+            ref="input" v-model="text" rows="1" class="input" :placeholder="$t('chat.placeholder')"
+            enterkeyhint="send" @keydown="onKeydown" @paste="onPaste"
+          />
+          <button v-if="!editing" class="icon-btn" :class="{ accent: showAttach }" @click="showAttach = !showAttach; showEmoji = false">
+            <Icon name="attach" />
+          </button>
+        </div>
+      </div>
+
+      <button
+        v-ripple class="send"
+        :class="{ recording: rec.recording.value }"
+        :title="canSend ? $t('chat.send') : $t('chat.recordVoice')"
+        @click="rec.recording.value ? finishRecording() : canSend || editing ? submit() : startRecording()"
+      >
+        <Transition name="swap" mode="out-in">
+          <Icon v-if="editing" key="check" name="check" />
+          <Icon v-else-if="canSend || rec.recording.value" key="send" name="send" />
+          <Icon v-else key="mic" name="mic" />
+        </Transition>
+      </button>
+
+      <ImageCropper v-if="cropping" :file="cropping" mode="send" @done="onCropped" @cancel="cropping = null" />
+
+      <input ref="photoInput" type="file" accept="image/*" multiple hidden @change="onPick($event, 'photo')" />
+      <input ref="fileInput" type="file" multiple hidden @change="onPick($event, 'file')" />
+    </template>
   </div>
 </template>
 
 <style scoped>
+.blocked {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px;
+  border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); color: var(--text-muted); font-size: 14px; text-align: center;
+}
 .composer {
   position: relative; display: flex; align-items: flex-end; gap: 8px;
   width: 100%; max-width: 760px; margin: 0 auto; padding: 6px 8px calc(8px + var(--safe-bottom));

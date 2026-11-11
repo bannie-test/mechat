@@ -12,6 +12,8 @@ export interface Profile {
   locale: Locale
   last_seen_at: string
   created_at: string
+  /** Local: the person's own display name when you've given them a nickname (display_name then holds the nickname). */
+  real_name?: string
 }
 
 export interface Attachment {
@@ -72,6 +74,8 @@ export interface ChatMember {
   joined_at: string
   last_read_at: string
   muted: boolean
+  /** False when the owner muted this member (or the group is restricted and they weren't picked). */
+  can_post: boolean
 }
 
 export interface ChatSummary {
@@ -84,6 +88,8 @@ export interface ChatSummary {
   muted: boolean
   last_read_at: string
   peer_id: string | null
+  /** Group: only the owner, admins and picked members can send. */
+  restricted?: boolean
   member_count: number
   unread_count: number
   last_message: Message | null
