@@ -7,7 +7,7 @@ const drafts = new Map<string, string>()
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDuration } from '@/lib/format'
-import { resizeImage, uploadAttachment } from '@/lib/storage'
+import { imageSize, resizeImage, uploadAttachment } from '@/lib/storage'
 import { vibrate } from '@/lib/motion'
 import { sfx } from '@/lib/sound'
 import { isWeatherCommand, WEATHER_COMMANDS } from '@/lib/weather'
@@ -21,10 +21,11 @@ import { useMessages } from '@/stores/messages'
 import { useRealtime } from '@/stores/realtime'
 import { useUi } from '@/stores/ui'
 import EmojiPanel from './EmojiPanel.vue'
+import ImageCropper from './ImageCropper.vue'
 import Icon from './Icon.vue'
 
 const props = defineProps<{ chatId: string; replyTo: Message | null; editing: Message | null }>()
-const emit = defineEmits<{ cancel: []; sent: []; editLast: [m: Message] }>()
+const emit = defineEmits<{ cancel: []; sent: []; editLast: [m: Message]; popover: [open: boolean] }>()
 
 const { t } = useI18n()
 const auth = useAuth()
@@ -152,18 +153,25 @@ async function submit() {
 }
 
 // ---- media -------------------------------------------------------------------
-async function sendImage(file: File) {
+/**
+ * The message shows up immediately with a local preview; resizing and uploading happen in the
+ * background (several files upload in parallel), with progress shown on the bubble.
+ */
+async function sendImage(file: Blob, name = (file as File).name || 'photo.jpg') {
   const isGif = file.type === 'image/gif'
-  const { blob, width, height } = isGif
-    ? await createImageBitmap(file).then((b) => ({ blob: file as Blob, width: b.width, height: b.height })).catch(() => ({ blob: file as Blob, width: 0, height: 0 }))
-    : await resizeImage(file)
-  const name = isGif ? file.name : file.name.replace(/\.\w+$/, '') + '.jpg'
+  const localUrl = URL.createObjectURL(file)
+  const { width, height } = await imageSize(localUrl)
+  const outName = isGif ? name : name.replace(/\.\w+$/, '') + '.jpg'
   const reply = props.replyTo?.id ?? null
   emit('sent')
+  sfx.sent()
   await messages.send(
     props.chatId,
-    { kind: 'image', attachment: { width, height, mime: blob.type, size: blob.size, name }, reply_to_id: reply, localUrl: URL.createObjectURL(blob) },
-    () => uploadAttachment(props.chatId, blob, name),
+    { kind: 'image', attachment: { width, height, mime: isGif ? file.type : 'image/jpeg', size: file.size, name: outName }, reply_to_id: reply, localUrl },
+    async (onProgress) => {
+      const blob = isGif ? file : (await resizeImage(file)).blob
+      return { ...(await uploadAttachment(props.chatId, blob, outName, onProgress)), size: blob.size, mime: blob.type }
+    },
   )
 }
 
@@ -171,34 +179,54 @@ async function sendFile(file: File) {
   if (file.size > 25 * 1024 * 1024) return ui.toast(t('errors.tooLarge'))
   const reply = props.replyTo?.id ?? null
   emit('sent')
+  sfx.sent()
   await messages.send(
     props.chatId,
     { kind: 'file', attachment: { name: file.name, size: file.size, mime: file.type }, reply_to_id: reply },
-    () => uploadAttachment(props.chatId, file, file.name),
+    (onProgress) => uploadAttachment(props.chatId, file, file.name, onProgress),
   )
+}
+
+/** Send many at once: each gets its bubble right away, uploads run in parallel. */
+function sendAll(files: File[], asPhotos = true) {
+  for (const f of files) void (asPhotos && f.type.startsWith('image/') ? sendImage(f) : sendFile(f))
+}
+
+// A single photo from the picker can be cropped / repositioned before sending.
+const cropping = ref<File | null>(null)
+function onCropped(blob: Blob | null) {
+  const f = cropping.value
+  cropping.value = null
+  if (!f) return
+  void sendImage(blob ?? f, f.name)
 }
 
 async function onPick(e: Event, kind: 'photo' | 'file') {
   const files = [...((e.target as HTMLInputElement).files ?? [])]
   ;(e.target as HTMLInputElement).value = ''
   showAttach.value = false
-  for (const f of files) {
-    if (kind === 'photo' && f.type.startsWith('image/')) await sendImage(f)
-    else await sendFile(f)
+  if (kind === 'photo' && files.length === 1 && files[0].type.startsWith('image/') && files[0].type !== 'image/gif') {
+    cropping.value = files[0]
+    return
   }
+  sendAll(files, kind === 'photo')
 }
 
 function onPaste(e: ClipboardEvent) {
   const files = [...(e.clipboardData?.files ?? [])]
   if (!files.length) return
   e.preventDefault()
-  for (const f of files) void (f.type.startsWith('image/') ? sendImage(f) : sendFile(f))
+  sendAll(files)
 }
 
 function onDrop(e: DragEvent) {
-  for (const f of [...(e.dataTransfer?.files ?? [])]) void (f.type.startsWith('image/') ? sendImage(f) : sendFile(f))
+  sendAll([...(e.dataTransfer?.files ?? [])])
 }
 defineExpose({ onDrop })
+
+// Let the chat know a popover is open, so message hover toolbars don't pop up over it.
+const popoverOpen = computed(() => showEmoji.value || showAttach.value || commandHints.value.length > 0)
+watch(popoverOpen, (v) => emit('popover', v))
 
 async function sendSticker(s: string) {
   showEmoji.value = false
@@ -235,7 +263,7 @@ async function finishRecording() {
   await messages.send(
     props.chatId,
     { kind: 'voice', attachment: { duration: r.duration, waveform: r.waveform, mime: r.mime, size: r.blob.size }, reply_to_id: reply, localUrl: URL.createObjectURL(r.blob) },
-    () => uploadAttachment(props.chatId, r.blob, `voice.${ext}`),
+    (onProgress) => uploadAttachment(props.chatId, r.blob, `voice.${ext}`, onProgress),
   )
 }
 
@@ -275,9 +303,17 @@ function snippet(m: Message) {
     </Transition>
     <Transition name="pop">
       <div v-if="showAttach" class="popover attach-pop">
-        <button v-ripple @click="photoInput?.click()"><Icon name="image" :size="22" />{{ $t('attach.photo') }}</button>
-        <button v-ripple @click="fileInput?.click()"><Icon name="file" :size="22" />{{ $t('attach.file') }}</button>
-        <button v-ripple @click="openApps"><Icon name="apps" :size="22" />{{ $t('apps.title') }}</button>
+        <button v-ripple @click="photoInput?.click()"><span class="att-ic sky"><Icon name="imageOutline" :size="22" /></span>{{ $t('attach.photo') }}</button>
+        <button v-ripple @click="fileInput?.click()"><span class="att-ic emerald"><Icon name="fileOutline" :size="22" /></span>{{ $t('attach.file') }}</button>
+        <button v-ripple @click="openApps">
+          <span class="att-ic apps">
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="4" width="4" height="4" rx="1.2" fill="#f43f5e" /><rect x="10" y="4" width="4" height="4" rx="1.2" fill="#f59e0b" /><rect x="16" y="4" width="4" height="4" rx="1.2" fill="#eab308" />
+              <rect x="4" y="10" width="4" height="4" rx="1.2" fill="#22c55e" /><rect x="10" y="10" width="4" height="4" rx="1.2" fill="#14b8a6" /><rect x="16" y="10" width="4" height="4" rx="1.2" fill="#0ea5e9" />
+              <rect x="4" y="16" width="4" height="4" rx="1.2" fill="#6366f1" /><rect x="10" y="16" width="4" height="4" rx="1.2" fill="#a855f7" /><rect x="16" y="16" width="4" height="4" rx="1.2" fill="#ec4899" />
+            </svg>
+          </span>{{ $t('apps.title') }}
+        </button>
       </div>
     </Transition>
 
@@ -334,6 +370,8 @@ function snippet(m: Message) {
       </Transition>
     </button>
 
+    <ImageCropper v-if="cropping" :file="cropping" mode="send" @done="onCropped" @cancel="cropping = null" />
+
     <input ref="photoInput" type="file" accept="image/*" multiple hidden @change="onPick($event, 'photo')" />
     <input ref="fileInput" type="file" multiple hidden @change="onPick($event, 'file')" />
   </div>
@@ -376,8 +414,12 @@ function snippet(m: Message) {
   right: 68px; display: grid; padding: 6px; min-width: 190px; border-radius: 14px; background: var(--surface);
   box-shadow: var(--shadow-lg); transform-origin: bottom right;
 }
-.attach-pop button { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 8px; font-weight: 500; }
+.attach-pop button { display: flex; align-items: center; gap: 12px; padding: 6px 12px 6px 8px; border-radius: 8px; font-weight: 500; }
 .attach-pop button:hover { background: var(--hover); }
+.att-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.att-ic.sky { color: #0ea5e9; background: color-mix(in srgb, #0ea5e9 13%, transparent); }
+.att-ic.emerald { color: #10b981; background: color-mix(in srgb, #10b981 13%, transparent); }
+.att-ic.apps { background: color-mix(in srgb, #a855f7 10%, transparent); }
 .cmd-pop {
   left: 8px; display: grid; padding: 6px; min-width: 260px; border-radius: 14px; background: var(--surface);
   box-shadow: var(--shadow-lg); transform-origin: bottom left;

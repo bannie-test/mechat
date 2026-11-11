@@ -17,6 +17,12 @@ const settings = useSettings()
 
 const mode = ref<'signin' | 'join'>(route.query.join !== undefined ? 'join' : 'signin')
 const step = ref<'form' | 'code'>('form')
+/** Sign-in method: email code / magic link, or username + password. */
+const method = ref<'code' | 'password'>((localStorage.getItem('iemanchat.loginMethod') as 'code' | 'password') || 'code')
+watch(method, (m) => { try { localStorage.setItem('iemanchat.loginMethod', m) } catch { /* private mode */ } })
+const login = ref('')
+const password = ref('')
+const showPassword = ref(false)
 const email = ref('')
 const name = ref('')
 const code = ref('')
@@ -42,8 +48,12 @@ const canSubmit = computed(() =>
   /.+@.+\..+/.test(email.value) && (mode.value === 'signin' || name.value.trim()),
 )
 
+const canPassword = computed(() => login.value.trim().length >= 3 && password.value.length >= 6)
+
 function describe(e: unknown) {
   const msg = String((e as { message?: string })?.message ?? '')
+  if (/INVALID_LOGIN|Invalid login credentials/i.test(msg)) return t('login.errors.badPassword')
+  if (/TOO_MANY_ATTEMPTS/i.test(msg)) return t('login.errors.tooMany')
   if (/rate|security purposes/i.test(msg)) return t('login.errors.rateLimit')
   if (/Signups not allowed|not found|otp_disabled/i.test(msg)) return t('login.errors.noAccount')
   if (/expired|invalid/i.test(msg)) return t('login.errors.badCode')
@@ -74,6 +84,25 @@ async function send() {
     if (!game.value) codeInput.value?.focus()
   } catch (e) {
     error.value = describe(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function passwordSignIn() {
+  if (!canPassword.value || busy.value) return
+  busy.value = true
+  verifying = true
+  error.value = ''
+  try {
+    await auth.signInWithPassword(login.value, password.value)
+    await diveIn()
+    void router.replace({ name: 'home' })
+  } catch (e) {
+    verifying = false
+    error.value = describe(e)
+    sad.value = true
+    setTimeout(() => (sad.value = false), 1800)
   } finally {
     busy.value = false
   }
@@ -159,7 +188,7 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
       <div class="card" :class="{ compact: step === 'code' }">
         <div class="brand">
           <img src="/favicon.svg" alt="" class="logo" />
-          <h1>iemanchat</h1>
+          <h1 class="wordmark">iemanchat</h1>
         </div>
 
         <Transition name="fade" mode="out-in">
@@ -169,9 +198,22 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
               <button :class="{ on: mode === 'join' }" @click="mode = 'join'; error = ''">{{ $t('login.join') }}</button>
               <i class="ink" :style="{ transform: mode === 'join' ? 'translateX(100%)' : 'none' }" />
             </div>
-            <p class="muted">{{ mode === 'signin' ? $t('login.signInHint') : $t('login.joinHint') }}</p>
+            <p class="muted">{{ mode === 'join' ? $t('login.joinHint') : method === 'password' ? $t('login.passwordHint') : $t('login.signInHint') }}</p>
 
-            <form class="stack" @submit.prevent="send">
+            <form v-if="mode === 'signin' && method === 'password'" class="stack" @submit.prevent="passwordSignIn">
+              <label class="field"><input v-model="login" autocomplete="username" autocapitalize="none" spellcheck="false" required /><span>{{ $t('login.usernameOrEmail') }}</span></label>
+              <label class="field pw">
+                <input v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required />
+                <span>{{ $t('login.password') }}</span>
+                <button type="button" class="eye" :title="$t(showPassword ? 'login.hidePassword' : 'login.showPassword')" @click="showPassword = !showPassword">{{ showPassword ? '🙈' : '👁️' }}</button>
+              </label>
+              <button class="btn block" :disabled="!canPassword || busy">
+                <span v-if="busy" class="spinner" />{{ $t('login.signIn') }}
+              </button>
+              <button type="button" class="mode-link" @click="method = 'code'; error = ''">{{ $t('login.useCode') }}</button>
+            </form>
+
+            <form v-else class="stack" @submit.prevent="send">
               <Transition name="bar">
                 <div v-if="mode === 'join'" class="stack">
                   <label class="field"><input v-model="name" autocomplete="name" maxlength="64" required /><span>{{ $t('login.yourName') }}</span></label>
@@ -181,6 +223,7 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
               <button class="btn block" :disabled="!canSubmit || busy">
                 <span v-if="busy" class="spinner" />{{ $t('login.sendCode') }}
               </button>
+              <button v-if="mode === 'signin'" type="button" class="mode-link" @click="method = 'password'; error = ''">{{ $t('login.usePassword') }}</button>
             </form>
           </div>
 
@@ -275,8 +318,8 @@ watch(() => auth.session, (s) => { if (s && !verifying) void router.replace({ na
 .compact .logo { width: 40px; height: 40px; }
 .compact { gap: 10px; padding: 18px 16px 26px; }
 @keyframes float { 50% { transform: translateY(-6px); } }
-h1 { margin: 0; font-size: 26px; }
-.compact h1 { font-size: 20px; }
+h1 { margin: 0; font-size: 34px; padding-bottom: 4px; }
+.compact h1 { font-size: 24px; }
 .stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; text-align: left; min-width: 0; }
 .card { grid-template-columns: minmax(0, 1fr); }
 .stack > p { margin: 0; text-align: center; }
@@ -284,6 +327,9 @@ h1 { margin: 0; font-size: 26px; }
 .tabs button { position: relative; z-index: 1; height: 36px; border-radius: 8px; font-weight: 600; color: var(--text-muted); transition: color 0.2s; }
 .tabs button.on { color: var(--text); }
 .ink { position: absolute; left: 3px; top: 3px; width: calc(50% - 3px); height: 36px; border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); transition: transform 0.3s var(--ease-out); }
+.pw { position: relative; }
+.pw input { padding-right: 44px; }
+.eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; font-size: 16px; }
 .code {
   width: 100%; min-width: 0; box-sizing: border-box; height: 60px; border-radius: 12px; border: 2px solid var(--border); background: transparent; text-align: center;
   font: 600 30px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 12px; outline: none; transition: border-color 0.2s;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { callLogInfo } from '@/lib/call/labels'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { supabase } from '@/lib/supabase'
@@ -106,6 +106,18 @@ watch(query, (v) => {
   }, 300)
 })
 
+// ---- profile card (avatar in the header) ---------------------------------------
+const profileOpen = ref(false)
+function goSettings() {
+  profileOpen.value = false
+  void router.push({ name: 'settings' })
+}
+function onDocDown(e: PointerEvent) {
+  if (profileOpen.value && !(e.target as HTMLElement).closest('.me-wrap')) profileOpen.value = false
+}
+onMounted(() => document.addEventListener('pointerdown', onDocDown))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
+
 async function openSearch() {
   searching.value = true
 }
@@ -144,15 +156,29 @@ function highlight(text: string) {
     <header class="head">
       <Transition name="fade" mode="out-in">
         <div v-if="!searching" key="title" class="row">
-          <button v-ripple class="icon-btn" :title="$t('settings.title')" @click="router.push({ name: 'settings' })">
-            <Icon name="settings" />
-          </button>
-          <h1 class="brand">iemanchat</h1>
+          <div class="me-wrap">
+            <button class="me" :title="auth.profile?.display_name" :aria-expanded="profileOpen" @click="profileOpen = !profileOpen">
+              <Avatar :id="auth.userId ?? ''" :name="auth.profile?.display_name ?? ''" :url="auth.profile?.avatar_url" :size="36" />
+            </button>
+            <Transition name="pop">
+              <div v-if="profileOpen" class="me-card" @keydown.esc="profileOpen = false">
+                <div class="me-cover" />
+                <Avatar class="me-avatar" :id="auth.userId ?? ''" :name="auth.profile?.display_name ?? ''" :url="auth.profile?.avatar_url" :size="72" />
+                <b class="me-name ellipsis">{{ auth.profile?.display_name }}</b>
+                <small class="muted">@{{ auth.profile?.username }}</small>
+                <p v-if="auth.profile?.bio" class="me-bio">{{ auth.profile.bio }}</p>
+                <div class="me-actions">
+                  <button v-ripple class="me-btn" @click="goSettings"><Icon name="settings" :size="20" />{{ $t('settings.title') }}</button>
+                  <button v-ripple class="me-btn icon" :title="$t('settings.theme')" @click="settings.toggleTheme($event)">
+                    <Icon :name="settings.isDark ? 'sun' : 'moon'" :size="20" />
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
+          <h1 class="brand wordmark">iemanchat</h1>
           <button v-ripple class="icon-btn" :title="$t('apps.title')" @click="ui.openAppDrawer()">
             <Icon name="apps" />
-          </button>
-          <button v-ripple class="icon-btn" :title="$t('settings.theme')" @click="settings.toggleTheme($event)">
-            <Icon :name="settings.isDark ? 'sun' : 'moon'" />
           </button>
           <button v-ripple class="icon-btn" :title="$t('common.search')" @click="openSearch">
             <Icon name="search" />
@@ -244,7 +270,7 @@ function highlight(text: string) {
 
     <Transition name="pop">
       <button v-if="!searching" v-ripple class="fab" :title="$t('newChat.title')" @click="router.push({ name: 'new' })">
-        <Icon name="edit" />
+        <Icon name="plus" :size="28" />
       </button>
     </Transition>
   </section>
@@ -254,7 +280,24 @@ function highlight(text: string) {
 .pane { position: relative; height: 100%; display: flex; flex-direction: column; }
 .head { padding: calc(8px + var(--safe-top)) 8px 8px; min-height: calc(var(--header-h) + var(--safe-top)); }
 .row { display: flex; align-items: center; gap: 4px; height: 40px; }
-.brand { flex: 1; margin: 0 0 0 8px; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.brand { flex: 1; margin: 0 0 0 10px; font-size: 25px; padding: 4px 0 6px; }
+.me-wrap { position: relative; }
+.me { display: grid; border-radius: 50%; padding: 2px; transition: box-shadow 0.2s, transform 0.15s; }
+.me:hover, .me[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--accent); }
+.me:active { transform: scale(0.94); }
+.me-card {
+  position: absolute; z-index: 50; top: calc(100% + 8px); left: 0; width: 260px; display: grid; justify-items: center; gap: 2px;
+  padding: 0 14px 14px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-lg); overflow: hidden;
+  transform-origin: top left; text-align: center;
+}
+.me-cover { justify-self: stretch; height: 54px; margin: 0 -14px; background: linear-gradient(120deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #ff5fa2)); }
+.me-avatar { margin-top: -36px; border-radius: 50%; box-shadow: 0 0 0 4px var(--surface); }
+.me-name { margin-top: 8px; font-size: 17px; max-width: 100%; }
+.me-bio { margin: 6px 0 0; font-size: 13.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.me-actions { display: flex; gap: 8px; width: 100%; margin-top: 12px; }
+.me-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; border-radius: 12px; background: var(--surface-2); font-weight: 600; }
+.me-btn:hover { background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); color: var(--accent); }
+.me-btn.icon { flex: none; width: 40px; }
 .search {
   flex: 1; height: 40px; border-radius: 20px; border: 2px solid transparent; padding: 0 16px;
   background: var(--surface-2); outline: none; transition: border-color 0.2s;

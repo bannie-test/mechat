@@ -212,13 +212,13 @@ onBeforeUnmount(() => {
 // ---- reply / edit / menu ------------------------------------------------------
 const replyTo = ref<Message | null>(null)
 const editing = ref<Message | null>(null)
-const menu = ref<{ msg: Message; x: number; y: number; rect: DOMRect; emojiGrid: boolean } | null>(null)
+const menu = ref<{ msg: Message; x: number; y: number; rect: DOMRect; mode: 'normal' | 'grid' | 'edit' } | null>(null)
 const root = ref<HTMLElement | null>(null)
 const infoOpen = ref(false)
 
-function openMenu(msg: Message, x: number, y: number, emojiGrid = false) {
+function openMenu(msg: Message, x: number, y: number, mode: 'normal' | 'grid' | 'edit' = 'normal') {
   if (!root.value) return
-  menu.value = { msg, x, y, rect: root.value.getBoundingClientRect(), emojiGrid }
+  menu.value = { msg, x, y, rect: root.value.getBoundingClientRect(), mode }
 }
 
 async function onMenuAction(action: MessageAction, target?: Message) {
@@ -252,6 +252,7 @@ function cancelContext() {
 
 // ---- drag & drop files (desktop) ---------------------------------------------
 const composer = ref<InstanceType<typeof Composer> | null>(null)
+const composerPopover = ref(false)
 const dragOver = ref(false)
 function onDrop(e: DragEvent) {
   dragOver.value = false
@@ -309,7 +310,7 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
       </button>
     </Transition>
 
-    <div ref="scroller" class="messages scroll" @scroll.passive="onScroll">
+    <div ref="scroller" class="messages scroll" :class="{ 'no-hover': composerPopover }" @scroll.passive="onScroll">
       <div class="inner">
         <div v-if="bucket.loading && !items.length" class="loading"><span class="spinner" /></div>
         <div v-else-if="bucket.loaded && !items.length" class="hello">
@@ -362,12 +363,12 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
     <footer class="foot">
       <Composer
         ref="composer" :chat-id="chatId" :reply-to="replyTo" :editing="editing"
-        @cancel="cancelContext" @sent="replyTo = null" @edit-last="(m) => (editing = m)"
+        @cancel="cancelContext" @sent="replyTo = null" @edit-last="(m) => (editing = m)" @popover="(v) => (composerPopover = v)"
       />
     </footer>
 
     <MessageMenu
-      v-if="menu" :msg="menu.msg" :x="menu.x" :y="menu.y" :container="menu.rect" :emoji-grid="menu.emojiGrid"
+      v-if="menu" :msg="menu.msg" :x="menu.x" :y="menu.y" :container="menu.rect" :mode="menu.mode"
       :mine="menu.msg.sender_id === auth.userId"
       @close="menu = null" @action="onMenuAction" @react="(e) => onReact(menu!.msg, e)"
     />
@@ -443,7 +444,9 @@ const unreadBelow = computed(() => (atBottom.value ? 0 : chat.value?.unread_coun
   display: grid; place-items: center; background: var(--surface); color: var(--text-muted); box-shadow: var(--shadow-lg);
 }
 .to-bottom .badge { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); }
-.foot { position: relative; z-index: 2; }
+.foot { position: relative; z-index: 6; }
+/* While an emoji / attach popover is open, hovering messages must not show their toolbars over it. */
+.messages.no-hover :deep(.hover-bar) { display: none; }
 
 .drop {
   position: absolute; inset: 12px; z-index: 40; display: grid; place-items: center; border-radius: 16px;

@@ -52,6 +52,8 @@ export interface Message {
   /** Local-only fields. */
   _status?: 'sending' | 'failed'
   _localUrl?: string
+  /** Upload progress 0..1 while sending an attachment. */
+  _progress?: number
   /** Only on this device, never sent (e.g. the weather card from /weather). */
   _local?: boolean
 }

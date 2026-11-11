@@ -56,6 +56,30 @@ export const useAuth = defineStore('auth', () => {
     await loadProfile()
   }
 
+  /** Username (or email) + password. */
+  async function signInWithPassword(login: string, password: string) {
+    let email = login.trim().toLowerCase()
+    if (!email.includes('@')) {
+      const { data, error } = await supabase.rpc('login_email', { p_username: email.replace(/^@/, ''), p_password: password })
+      if (error) throw error
+      email = String(data)
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    session.value = data.session
+    await loadProfile()
+  }
+
+  async function hasPassword() {
+    const { data } = await supabase.rpc('has_password')
+    return Boolean(data)
+  }
+
+  async function setPassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+  }
+
   async function updateProfile(patch: Partial<Pick<Profile, 'display_name' | 'username' | 'bio' | 'avatar_url' | 'locale'>>) {
     if (!userId.value) return
     const { data, error } = await supabase.from('profiles').update(patch).eq('id', userId.value).select().single()
@@ -70,5 +94,5 @@ export const useAuth = defineStore('auth', () => {
     profile.value = null
   }
 
-  return { session, profile, ready, userId, init, loadProfile, sendCode, verifyCode, updateProfile, signOut }
+  return { session, profile, ready, userId, init, loadProfile, sendCode, verifyCode, signInWithPassword, hasPassword, setPassword, updateProfile, signOut }
 })
