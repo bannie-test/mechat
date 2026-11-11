@@ -17,6 +17,8 @@ interface ChatMessages {
   loading: boolean
 }
 
+export type Preparer = (onProgress: (fraction: number) => void) => Promise<Attachment>
+
 export interface Draft {
   kind: MessageKind
   content?: string | null
@@ -33,7 +35,21 @@ export const useMessages = defineStore('messages', () => {
   /** Messages fetched individually (e.g. reply targets outside the loaded page). */
   const extras = reactive<Record<string, Message | null>>({})
   /** Upload steps for messages that still need their attachment (enables retry). */
-  const preparers = new Map<string, () => Promise<Attachment>>()
+  const preparers = new Map<string, Preparer>()
+
+  // At most 3 uploads at a time: parallel enough to be fast, without starving each other.
+  let running = 0
+  const waiting: (() => void)[] = []
+  async function slot<T>(fn: () => Promise<T>): Promise<T> {
+    if (running >= 3) await new Promise<void>((r) => waiting.push(r))
+    running++
+    try {
+      return await fn()
+    } finally {
+      running--
+      waiting.shift()?.()
+    }
+  }
 
   function bucket(chatId: string): ChatMessages {
     // Read back through the reactive object: `x ??= {}` would return the raw, untracked object.
@@ -124,7 +140,12 @@ export const useMessages = defineStore('messages', () => {
       let attachment = msg.attachment
       const prepare = preparers.get(msg.id)
       if (prepare) {
-        attachment = { ...(attachment ?? {}), ...(await prepare()) }
+        const live = () => bucket(msg.chat_id).items.find((m) => m.id === msg.id)
+        const uploaded = await slot(() => prepare((f) => {
+          const m = live()
+          if (m) m._progress = f
+        }))
+        attachment = { ...(attachment ?? {}), ...uploaded }
         preparers.delete(msg.id)
       }
       const { data, error } = await supabase
@@ -145,7 +166,7 @@ export const useMessages = defineStore('messages', () => {
     }
   }
 
-  async function send(chatId: string, draft: Draft, prepare?: () => Promise<Attachment>) {
+  async function send(chatId: string, draft: Draft, prepare?: Preparer) {
     const msg: Message = {
       id: crypto.randomUUID(),
       chat_id: chatId,
@@ -189,6 +210,7 @@ export const useMessages = defineStore('messages', () => {
 
   async function retry(msg: Message) {
     msg._status = 'sending'
+    msg._progress = 0
     await deliver(msg)
   }
 

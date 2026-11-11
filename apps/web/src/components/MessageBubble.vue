@@ -31,7 +31,7 @@ const props = defineProps<{
   animate?: boolean
 }>()
 const emit = defineEmits<{
-  menu: [x: number, y: number, emojiGrid?: boolean]
+  menu: [x: number, y: number, mode?: 'normal' | 'grid' | 'edit']
   reply: []
   react: [emoji: string]
   retry: []
@@ -53,6 +53,13 @@ const bigEmoji = computed(() => props.msg.kind === 'text' && isOnlyEmoji(props.m
 const bare = computed(() => props.msg.kind === 'sticker' || bigEmoji.value)
 const segments = computed(() => linkify(props.msg.content ?? ''))
 const actions = computed(() => messageActions(props.msg, mine.value))
+/** overlay: on top of media; block: own line under voice/file/call; default: bottom-right corner of the text. */
+const metaClass = computed(() => {
+  const k = props.msg.kind
+  if ((k === 'image' && !props.msg.content) || k === 'gif' || bare.value) return 'overlay'
+  if (k === 'voice' || k === 'file' || k === 'call') return 'block'
+  return 'corner'
+})
 const hoverable = computed(() => !props.msg._status && props.msg.kind !== 'system')
 
 const grouped = computed(() => {
@@ -152,8 +159,8 @@ onBeforeUnmount(() => unbind?.())
 
         <!-- content -->
         <template v-if="msg.kind === 'image'">
-          <MediaImage :attachment="msg.attachment" :local-url="msg._localUrl" :uploading="msg._status === 'sending'" @open="emit('open', $event)" />
-          <p v-if="msg.content" class="text caption">{{ msg.content }}</p>
+          <MediaImage :attachment="msg.attachment" :local-url="msg._localUrl" :uploading="msg._status === 'sending'" :progress="msg._progress" @open="emit('open', $event)" />
+          <p v-if="msg.content" class="text caption">{{ msg.content }}<span class="meta-space" aria-hidden="true"><span v-if="msg.edited_at">{{ $t('chat.edited') }} </span>{{ formatTime(msg.created_at, settings.locale) }}<i v-if="mine" /><span v-if="mine && msg._status === 'failed'">{{ $t('chat.notSent') }}</span></span></p>
         </template>
         <MediaImage v-else-if="msg.kind === 'gif'" :attachment="msg.attachment" :max-width="260" @open="emit('open', $event)" />
         <div v-else-if="msg.kind === 'sticker'" class="sticker">{{ msg.content }}</div>
@@ -162,13 +169,17 @@ onBeforeUnmount(() => unbind?.())
           <span class="file-icon"><span v-if="msg._status === 'sending'" class="spinner file-spin" /><Icon v-else name="download" /></span>
           <span class="file-meta">
             <span class="ellipsis">{{ msg.attachment?.name }}</span>
-            <small>{{ formatBytes(msg.attachment?.size) }}</small>
+            <small v-if="msg._status === 'sending'" class="up">
+              <span class="bar"><i :style="{ width: Math.round((msg._progress ?? 0) * 100) + '%' }" /></span>
+              {{ formatBytes((msg.attachment?.size ?? 0) * (msg._progress ?? 0)) }} / {{ formatBytes(msg.attachment?.size) }}
+            </small>
+            <small v-else>{{ formatBytes(msg.attachment?.size) }}</small>
           </span>
         </button>
         <CallLog v-else-if="msg.kind === 'call'" :msg="msg" :mine="mine" :chat-type="chatType" />
-        <p v-else class="text" :class="{ big: bigEmoji }"><template v-for="(s, i) in segments" :key="i"><a v-if="s.href" :href="s.href" target="_blank" rel="noopener noreferrer" @click.stop>{{ s.text }}</a><template v-else>{{ s.text }}</template></template></p>
+        <p v-else class="text" :class="{ big: bigEmoji }"><template v-for="(s, i) in segments" :key="i"><a v-if="s.href" :href="s.href" target="_blank" rel="noopener noreferrer" @click.stop>{{ s.text }}</a><template v-else>{{ s.text }}</template></template><template v-if="!bigEmoji"><span class="meta-space" aria-hidden="true"><span v-if="msg.edited_at">{{ $t('chat.edited') }} </span>{{ formatTime(msg.created_at, settings.locale) }}<i v-if="mine" /><span v-if="mine && msg._status === 'failed'">{{ $t('chat.notSent') }}</span></span></template></p>
 
-        <span class="meta" :class="{ overlay: (msg.kind === 'image' && !msg.content) || msg.kind === 'gif' || bare }">
+        <span class="meta" :class="metaClass">
           <span v-if="msg.edited_at" class="edited">{{ $t('chat.edited') }}</span>
           {{ formatTime(msg.created_at, settings.locale) }}
           <template v-if="mine">
@@ -194,7 +205,8 @@ onBeforeUnmount(() => unbind?.())
           <button class="hb-btn" :title="$t('menu.react')"><Icon name="smile" :size="18" /></button>
           <div class="hb-pop hb-emoji">
             <button v-for="e in settings.quickReactions" :key="e" class="hb-e" @click.stop="emit('react', e)">{{ e }}</button>
-            <button class="hb-e hb-plus" :title="$t('menu.moreReactions')" @click.stop="(ev) => emit('menu', ev.clientX, ev.clientY, true)"><Icon name="plus" :size="18" /></button>
+            <button class="hb-e hb-plus" :title="$t('menu.moreReactions')" @click.stop="(ev) => emit('menu', ev.clientX, ev.clientY, 'grid')"><Icon name="plus" :size="18" /></button>
+            <button class="hb-e hb-plus" :title="$t('menu.editReactions')" @click.stop="(ev) => emit('menu', ev.clientX, ev.clientY, 'edit')"><Icon name="edit" :size="16" /></button>
           </div>
         </div>
         <button class="hb-btn" :title="$t('menu.reply')" @click.stop="emit('reply')"><Icon name="reply" :size="18" /></button>
@@ -220,7 +232,7 @@ onBeforeUnmount(() => unbind?.())
 .row.first { margin-top: 6px; }
 .row.mine { flex-direction: row-reverse; }
 .avatar-slot { width: 34px; flex: none; align-self: flex-end; }
-.swipe { display: flex; flex-direction: column; max-width: min(78%, 480px); transition: transform 0.25s var(--ease-out); }
+.swipe { display: flex; flex-direction: column; align-items: flex-start; max-width: min(78%, 480px); transition: transform 0.25s var(--ease-out); }
 .mine .swipe { align-items: flex-end; }
 
 .bubble {
@@ -250,26 +262,30 @@ onBeforeUnmount(() => unbind?.())
 .quote b { color: var(--accent); font-weight: 600; }
 .image .quote, .gif .quote { margin: 4px 4px 6px; width: auto; }
 
-.text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; display: inline; }
-.text.big { font-size: 42px; line-height: 1.15; display: block; }
-.caption { display: block; padding: 4px 7px 0; }
-.text::after { content: ''; display: inline-block; width: var(--meta-w, 58px); }
-.mine .text::after { --meta-w: 76px; }
-.row:has(.failed) .text::after { --meta-w: 130px; }
-.text.big::after { display: none; }
+.text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; display: block; }
+.text.big { font-size: 42px; line-height: 1.15; }
+.caption { padding: 4px 7px 0; }
+/* Invisible copy of the time/ticks at the end of the last line: reserves room so the real meta can
+   sit in the bottom-right corner; if the last line is full, it wraps and the bubble gains a line. */
+.meta-space {
+  display: inline-flex; gap: 3px; margin-left: 10px; font-size: 11.5px; line-height: 1; visibility: hidden;
+  white-space: nowrap; vertical-align: baseline; pointer-events: none; user-select: none;
+}
+.meta-space i { width: 16px; }
 .sticker { font-size: 96px; line-height: 1.1; padding: 4px; }
 
 .meta {
-  float: right; position: relative; bottom: -4px; margin: -10px 0 0 8px; display: inline-flex; align-items: center; gap: 3px;
-  font-size: 11.5px; color: var(--bubble-meta); white-space: nowrap; user-select: none;
+  display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; line-height: 1; color: var(--bubble-meta);
+  white-space: nowrap; user-select: none;
 }
 .mine .meta { color: var(--bubble-out-meta); }
+.meta.corner { position: absolute; right: 10px; bottom: 6px; }
+.image .meta.corner { right: 10px; bottom: 7px; }
+.meta.block { display: flex; justify-content: flex-end; margin-top: 3px; }
 .meta.overlay {
-  position: absolute; right: 8px; bottom: 8px; margin: 0; float: none;
-  padding: 1px 6px; border-radius: 10px; background: rgba(0, 0, 0, 0.42); color: #fff;
+  position: absolute; right: 8px; bottom: 8px; padding: 3px 6px; border-radius: 10px; background: rgba(0, 0, 0, 0.42); color: #fff;
 }
 .bare .meta.overlay { right: 2px; bottom: 2px; }
-.voice + .meta, .file + .meta, .call-log + .meta { float: none; display: flex; justify-content: flex-end; margin: 2px 0 0; bottom: 0; }
 .edited { font-style: italic; }
 .failed { color: var(--danger); display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; }
 .sending { display: inline-grid; place-items: center; width: 14px; height: 14px; }
@@ -320,6 +336,9 @@ onBeforeUnmount(() => unbind?.())
 .file-meta { display: grid; min-width: 0; }
 .file-spin { width: 22px; height: 22px; border-width: 2.5px; border-color: currentColor; border-right-color: transparent; }
 .file-meta small { color: var(--bubble-meta); }
+.up { display: grid; gap: 3px; font-variant-numeric: tabular-nums; }
+.bar { display: block; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 20%, transparent); overflow: hidden; min-width: 140px; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.2s; }
 
 .reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
 .chip {

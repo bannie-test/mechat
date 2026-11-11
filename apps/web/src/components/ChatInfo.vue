@@ -12,6 +12,7 @@ import { useSettings } from '@/stores/settings'
 import { useUi } from '@/stores/ui'
 import Avatar from './Avatar.vue'
 import Icon from './Icon.vue'
+import ImageCropper from './ImageCropper.vue'
 import PeoplePicker from './PeoplePicker.vue'
 import Sheet from './Sheet.vue'
 
@@ -51,8 +52,16 @@ async function saveTitle() {
   if (v && v !== props.chat.title) await chats.updateGroup(props.chat.id, { title: v }).catch(() => ui.toast(t('errors.generic')))
 }
 
-async function pickAvatar(e: Event) {
-  const f = (e.target as HTMLInputElement).files?.[0]
+const cropping = ref<File | null>(null)
+function pickAvatar(e: Event) {
+  const input = e.target as HTMLInputElement
+  const picked = input.files?.[0]
+  input.value = ''
+  if (picked) cropping.value = picked
+}
+async function onAvatarCropped(blob: Blob | null) {
+  const f = blob ?? cropping.value
+  cropping.value = null
   if (!f || !auth.userId) return
   try {
     const url = await uploadAvatar(auth.userId, f)
@@ -141,6 +150,7 @@ async function openMember(id: string) {
       </button>
       <button v-ripple class="list-item danger-item" @click="leave"><Icon name="logout" />{{ $t('chatInfo.leave') }}</button>
     </div>
+    <ImageCropper v-if="cropping" :file="cropping" mode="avatar" @done="onAvatarCropped" @cancel="cropping = null" />
   </Sheet>
 </template>
 

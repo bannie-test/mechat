@@ -1,3 +1,4 @@
+import { config } from '@/config'
 import { supabase } from './supabase'
 import type { Attachment } from './types'
 
@@ -27,14 +28,42 @@ function safeName(name: string) {
   return name.normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-80) || 'file'
 }
 
-export async function uploadAttachment(chatId: string, file: Blob, name: string): Promise<Attachment> {
+/**
+ * Uploads straight to the Storage REST endpoint with XHR so we get upload progress
+ * (supabase-js uses fetch, which can't report it).
+ */
+export async function uploadAttachment(
+  chatId: string, file: Blob, name: string, onProgress?: (fraction: number) => void,
+): Promise<Attachment> {
   const path = `${chatId}/${crypto.randomUUID()}-${safeName(name)}`
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type || 'application/octet-stream',
-    cacheControl: '31536000',
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token ?? config.supabaseAnonKey
+  const url = `${config.supabaseUrl}/storage/v1/object/${BUCKET}/${path.split('/').map(encodeURIComponent).join('/')}`
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.setRequestHeader('apikey', config.supabaseAnonKey)
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    xhr.setRequestHeader('cache-control', 'max-age=31536000')
+    xhr.setRequestHeader('x-upsert', 'false')
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total) }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`upload failed (${xhr.status}): ${xhr.responseText}`)))
+    xhr.onerror = () => reject(new Error('upload failed (network)'))
+    xhr.send(file)
   })
-  if (error) throw error
+  onProgress?.(1)
   return { path, name, mime: file.type, size: file.size }
+}
+
+/** Width/height of an image without decoding it at full cost twice. */
+export function imageSize(src: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => resolve({ width: 0, height: 0 })
+    img.src = src
+  })
 }
 
 export async function copyAttachment(fromPath: string, toChatId: string): Promise<string> {

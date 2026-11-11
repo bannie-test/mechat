@@ -75,6 +75,14 @@
   --bubble-out-meta: color-mix(in srgb, var(--custom-accent) 35%, #fff);
 }
 
+/* The "iemanchat" wordmark: display font, tinted with the current theme color. */
+.wordmark {
+  font-family: 'Pacifico', 'Brush Script MT', cursive; font-weight: 400; line-height: 1.2; letter-spacing: 0.2px;
+  color: var(--accent);
+  background: linear-gradient(100deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #ff5fa2));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #app { height: 100%; }
 html { -webkit-text-size-adjust: 100%; }

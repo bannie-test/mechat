@@ -11,6 +11,7 @@ import type { Locale } from '@/lib/types'
 import { ACCENTS } from '@/lib/emoji'
 import Avatar from './Avatar.vue'
 import EmojiGrid from './EmojiGrid.vue'
+import ImageCropper from './ImageCropper.vue'
 import Icon from './Icon.vue'
 import ScreenHeader from './ScreenHeader.vue'
 
@@ -30,7 +31,31 @@ const pushBusy = ref(false)
 
 onMounted(async () => {
   push.value = await pushState().catch(() => 'unsupported' as const)
+  hasPw.value = await auth.hasPassword().catch(() => false)
 })
+
+// ---- password (for username + password sign-in) ------------------------------
+const hasPw = ref(false)
+const pwOpen = ref(false)
+const pw1 = ref('')
+const pw2 = ref('')
+const pwBusy = ref(false)
+async function savePassword() {
+  if (pw1.value.length < 8) return ui.toast(t('settings.passwordShort'))
+  if (pw1.value !== pw2.value) return ui.toast(t('settings.passwordMismatch'))
+  pwBusy.value = true
+  try {
+    await auth.setPassword(pw1.value)
+    hasPw.value = true
+    pwOpen.value = false
+    pw1.value = pw2.value = ''
+    ui.toast(t('settings.passwordSaved'), undefined, 2000)
+  } catch (e) {
+    ui.toast((e as { message?: string }).message || t('errors.generic'))
+  } finally {
+    pwBusy.value = false
+  }
+}
 
 const dirty = () =>
   name.value.trim() !== auth.profile?.display_name ||
@@ -55,8 +80,16 @@ async function save() {
   }
 }
 
-async function pickAvatar(e: Event) {
-  const f = (e.target as HTMLInputElement).files?.[0]
+const cropping = ref<File | null>(null)
+function pickAvatar(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  input.value = ''
+  if (f) cropping.value = f
+}
+async function onAvatarCropped(blob: Blob | null) {
+  const f = blob ?? cropping.value
+  cropping.value = null
   if (!f || !auth.userId) return
   uploading.value = true
   try {
@@ -137,6 +170,24 @@ async function signOut() {
         <label class="field"><input v-model="bio" maxlength="200" @blur="save" /><span>{{ $t('settings.bio') }}</span></label>
         <small class="muted">{{ $t('settings.usernameHint') }}</small>
       </div>
+
+      <div class="section-title">{{ $t('settings.security') }}</div>
+      <button v-ripple class="list-item" @click="pwOpen = !pwOpen">
+        <Icon name="lock" class="muted" />
+        <span class="grow">
+          {{ hasPw ? $t('settings.changePassword') : $t('settings.setPassword') }}
+          <small class="muted block">{{ $t('settings.passwordHint', { u: auth.profile?.username ?? '' }) }}</small>
+        </span>
+        <Icon name="chevron" class="muted" :style="{ transform: pwOpen ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }" />
+      </button>
+      <Transition name="bar">
+        <form v-if="pwOpen" class="form pw-form" @submit.prevent="savePassword">
+          <input :value="auth.profile?.username" autocomplete="username" hidden />
+          <label class="field"><input v-model="pw1" type="password" autocomplete="new-password" minlength="8" required /><span>{{ $t('settings.newPassword') }}</span></label>
+          <label class="field"><input v-model="pw2" type="password" autocomplete="new-password" minlength="8" required /><span>{{ $t('settings.confirmPassword') }}</span></label>
+          <button class="btn" :disabled="pwBusy || !pw1 || !pw2"><span v-if="pwBusy" class="spinner sm" />{{ $t('common.save') }}</button>
+        </form>
+      </Transition>
 
       <div class="section-title">{{ $t('settings.appearance') }}</div>
       <div class="seg">
@@ -223,6 +274,7 @@ async function signOut() {
       </button>
 
       <button v-ripple class="list-item danger" @click="signOut"><Icon name="logout" />{{ $t('settings.signOut') }}</button>
+      <ImageCropper v-if="cropping" :file="cropping" mode="avatar" @done="onAvatarCropped" @cancel="cropping = null" />
       <p class="muted version">iemanchat · v0.1.0</p>
     </div>
   </section>
@@ -275,5 +327,9 @@ async function signOut() {
 .grid-wrap { padding: 8px 8px 0; }
 .grid-wrap :deep(.egrid) { width: 100%; max-width: none; box-shadow: none; background: var(--surface-2); }
 .grid-wrap :deep(.g) { background: var(--surface-2); }
+.pw-form { padding: 8px 8px 4px; }
+.pw-form .btn { justify-self: end; display: inline-flex; gap: 8px; align-items: center; }
+.bar-enter-active, .bar-leave-active { transition: max-height 0.3s var(--ease-out), opacity 0.25s; max-height: 220px; overflow: hidden; }
+.bar-enter-from, .bar-leave-to { max-height: 0; opacity: 0; }
 .version { text-align: center; font-size: 12px; margin-top: 20px; }
 </style>
